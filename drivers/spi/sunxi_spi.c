@@ -546,14 +546,7 @@ static int sunxi_spi_gpio_init(void)
 
 	sunxi_gpio_set_pull(SUNXI_GPC(1), 1);
 	sunxi_gpio_set_pull(SUNXI_GPC(10), 1);
-#elif defined(CONFIG_MACH_SUN8IW11)
-	sunxi_gpio_set_cfgpin(SUNXI_GPC(2), SUNXI_GPC_SPI0); /*spi0_sclk */
-	sunxi_gpio_set_cfgpin(SUNXI_GPC(23), SUNXI_GPC_SPI0); /*spi0_cs0*/
 
-	sunxi_gpio_set_cfgpin(SUNXI_GPC(0), SUNXI_GPC_SPI0); /*spi0_mosi*/
-	sunxi_gpio_set_cfgpin(SUNXI_GPC(1), SUNXI_GPC_SPI0); /*spi0_miso*/
-
-	sunxi_gpio_set_pull(SUNXI_GPC(23), 1);
 #elif  defined(CONFIG_MACH_SUN8IW18)
 	sunxi_gpio_set_cfgpin(SUNXI_GPC(0), SUN50I_GPC_SPI0); /*spi0_sclk */
 	sunxi_gpio_set_cfgpin(SUNXI_GPC(3), SUN50I_GPC_SPI0); /*spi0_cs0*/
@@ -604,7 +597,7 @@ static int sunxi_spi_clk_init(u32 bus, u32 mod_clk)
 #else
 	source_clk = clock_get_pll6() * 1000000;
 	SPI_INF("source_clk: %d Hz, mod_clk: %d Hz\n", source_clk, mod_clk);
-
+	
 	div = (source_clk + mod_clk - 1) / mod_clk;
 	div = div == 0 ? 1 : div;
 	if (div > 128) {
@@ -626,23 +619,10 @@ static int sunxi_spi_clk_init(u32 bus, u32 mod_clk)
 	}
 
 	factor_m = m - 1;
-#if defined(CONFIG_MACH_SUN8IW11)
-	rval = (1U << 31) | (0x1 << 24) | (n << 16) | factor_m;
-#else
 	rval = (1U << 31) | (0x1 << 24) | (n << 8) | factor_m;
-#endif
 
 #endif
 	writel(rval, (volatile void __iomem *)mclk_base);
-
-#if defined(CONFIG_MACH_SUN8IW11)
-	/* spi reset */
-	writel(readl(&ccm->ahb_reset0_cfg) & ~(1 << 20), &ccm->ahb_reset0_cfg);
-	writel(readl(&ccm->ahb_reset0_cfg) | (1 << 20), &ccm->ahb_reset0_cfg);
-
-	/* spi gating */
-	writel(readl(&ccm->ahb_gate0) | (1 << 20), &ccm->ahb_gate0);
-#else
 	/* spi reset */
 	setbits_le32(&ccm->spi_gate_reset, (0<<RESET_SHIFT));
 	setbits_le32(&ccm->spi_gate_reset, (1<<RESET_SHIFT));
@@ -650,7 +630,6 @@ static int sunxi_spi_clk_init(u32 bus, u32 mod_clk)
 	/* spi gating */
 	setbits_le32(&ccm->spi_gate_reset, (1<<GATING_SHIFT));
 	/*sclk_freq = source_clk / (1 << n) / m*/
-#endif
 
 	SPI_INF("src: %d Hz, spic:%d Hz,  n=%d, m=%d\n",source_clk, source_clk/ (1 << n) / m, n, m);
 
@@ -693,21 +672,12 @@ static int sunxi_spi_clk_exit(void)
 {
 	struct sunxi_ccm_reg *const ccm =
 		(struct sunxi_ccm_reg *)SUNXI_CCM_BASE;
-
-#if defined(CONFIG_MACH_SUN8IW11)
-	/* clr spi gating */
-	writel(readl(&ccm->ahb_gate0) & ~(1 << 20), &ccm->ahb_gate0);
-
-	/* clr spi reset */
-	writel(readl(&ccm->ahb_reset0_cfg) & ~(1 << 20), &ccm->ahb_reset0_cfg);
-
-#else
 	/* spi gating */
 	clrbits_le32(&ccm->spi_gate_reset, 1<<GATING_SHIFT);
-
+	
 	/* spi reset */
 	clrbits_le32(&ccm->spi_gate_reset, 1<<RESET_SHIFT);
-#endif
+	
 	return 0;
 }
 
@@ -1046,7 +1016,7 @@ struct spi_slave *spi_setup_slave(unsigned int bus, unsigned int cs,
 
 void spi_free_slave(struct spi_slave *slave)
 {
-	struct sunxi_spi_slave *sunxi_slave = to_sunxi_slave(slave);
+	struct sunxi_spi_slave *sunxi_slave = to_sunxi_slave(slave);	
 	SPI_ENTER();
 	free(sunxi_slave);
 
@@ -1064,7 +1034,7 @@ int spi_claim_bus(struct spi_slave *slave)
 	uint sclk_freq = 0;
 
 	SPI_ENTER();
-
+	
 	sclk_freq = sunxi_get_spic_clk(0);
 	if(!sclk_freq)
 		return -1;
@@ -1226,6 +1196,6 @@ int spi_xfer(struct spi_slave *slave, unsigned int bitlen,
 		return -1;
 	}
 	spi_clr_irq_pending(0xffffffff, base_addr);
-
+	
 	return 0;
 }

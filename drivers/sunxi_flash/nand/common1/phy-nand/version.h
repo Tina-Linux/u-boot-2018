@@ -4,8 +4,7 @@
 #define __VERSION_H__
 
 #include "rawnand/controller/ndfc_base.h"
-//#include "rawnand/rawnand.h"
-#include <sunxi_nand.h>
+#include "rawnand/rawnand.h"
 
 __u32 nand_get_nand_version(void);
 int nand_get_version(__u8 *nand_version);

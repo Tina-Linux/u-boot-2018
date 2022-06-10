@@ -238,7 +238,7 @@ static int mmc_set_mod_clk(struct sunxi_mmc_priv *priv, unsigned int hz)
 		pll = CCM_MMC_CTRL_OSCM24;
 		pll_hz = 24000000;
 	} else {
-#if (!(defined(CONFIG_MACH_SUN8IW7) || defined(CONFIG_MACH_SUN8IW11)))
+#if (!defined (CONFIG_MACH_SUN8IW7))
 		pll = CCM_MMC_CTRL_PLL6X2;
 		pll_hz = clock_get_pll6() * 2 *1000000;
 #else

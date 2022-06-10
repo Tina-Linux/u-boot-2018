@@ -27,11 +27,10 @@
 #include <stdio.h>
 #include <sunxi_nand.h>
 #include "nand_physic_interface.h"
-/*#include "nand-partition/phy.h"*/
-#include <sunxi_nand_partitions.h>
+#include "nand-partition/phy.h"
 #include "rawnand/rawnand_chip.h"
 #include "rawnand/controller/ndfc_base.h"
-/*#include "rawnand/rawnand.h"*/
+#include "rawnand/rawnand.h"
 #include "rawnand/rawnand_base.h"
 #include "rawnand/rawnand_cfg.h"
 #include "nand.h"
@@ -39,7 +38,6 @@
 #include "spinand/spinand.h"
 #include "nand_weak.h"
 #include "../nand_osal_uboot.h"
-#include <sunxi_nand_partitions.h>
 /*#include <linux/mtd/aw-spinand-nftl.h>*/
 //#define POWER_OFF_DBG
 __u32 storage_type;
@@ -245,8 +243,7 @@ u32 NAND_GetLogicPageSize(void)
 	if (nand_use_ubi())
 		return 16384;
 #endif
-
-	return (nand_get_super_chip_page_size() << 9);
+	return 512 * aw_nand_info.SectorNumsPerPage;
 }
 
 /*****************************************************************************

@@ -45,6 +45,11 @@ config SUNXI_VERSION1
           help
             Support for the sunxi version 1 memory layout.
 
+config SUNXI_GPIO_V2
+          bool
+          help
+            Support for the sunxi version 2 gpio configure.
+
 config SUNXI_SECURE
           bool
           help
@@ -120,6 +125,7 @@ config MACH_SUN20IW1
 	select SUN8I_RSB
 	select SUNXI_NCAT_V2
 	select SUNXI_WDT_V2
+	select SUNXI_GPIO_V2
 
 endchoice
 

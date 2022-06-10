@@ -28,7 +28,6 @@ obj-$(CONFIG_MACH_SUN8IW16)	+= clock_sun8iw16.o
 obj-$(CONFIG_MACH_SUN8IW18)	+= clock_sun8iw18.o board_sun8iw18.o
 obj-$(CONFIG_MACH_SUN8IW19)	+= clock_sun8iw19.o
 obj-$(CONFIG_MACH_SUN8IW7) += clock_sun8iw7.o
-obj-$(CONFIG_MACH_SUN8IW11) += clock_sun8iw11.o
 obj-$(CONFIG_MACH_SUN20IW1) += clock_sun20iw1.o
 obj-$(CONFIG_MACH_SUN8IW20) += clock_sun8iw20.o
 obj-$(CONFIG_MACH_SUN8IW21) += clock_sun8iw21.o

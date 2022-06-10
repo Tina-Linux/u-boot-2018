@@ -646,7 +646,7 @@ int smc_tee_inform_fdt(uint64_t base, uint32_t size)
 	arm_smccc_smc(OPTEE_SMC_SUNXI_INFORM_FDT, base, 0, size, 0, 0, 0, 0,
 		      &param);
 	if (param.a0 != 0) {
-		pr_err("%s failed with: %ld", __func__, param.a0);
+		pr_msg("%s failed with: %ld", __func__, param.a0);
 		return param.a0;
 	}
 	return 0;

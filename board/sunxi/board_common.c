@@ -671,20 +671,17 @@ int update_boot0_head_for_ota(void)
 
 int board_late_init(void)
 {
-	int work_mode = get_boot_work_mode();
+	if (get_boot_work_mode() == WORK_MODE_BOOT) {
 #ifdef CONFIG_SUNXI_TV_FASTLOGO
-	struct fastlogo_t *p_fastlogo = NULL;
-	if (work_mode == WORK_MODE_BOOT || work_mode == WORK_MODE_CARD_UPDATE ||
-	    work_mode == WORK_MODE_CARD_PRODUCT) {
+		struct fastlogo_t *p_fastlogo;
 		p_fastlogo =
-			create_fastlogo_inst("bootlogo.bmp", "bootloader",
-					     "LogoRegData.bin", "bootloader");
+			create_fastlogo_inst("bootlogo.bmp", "boot-resource",
+					     "LogoRegData.bin",
+					     "boot-resource");
 		if (p_fastlogo) {
 			p_fastlogo->display_fastlogo(p_fastlogo);
 		}
-	}
 #endif
-	if (work_mode == WORK_MODE_BOOT) {
 #ifdef CONFIG_SUNXI_SWITCH_SYSTEM
 		sunxi_auto_switch_system();
 #endif
@@ -706,9 +703,7 @@ int board_late_init(void)
 #endif
 
 #ifdef CONFIG_SUNXI_ARISC_EXIST
-#ifndef CONFIG_ARISC_DEASSERT_BEFORE_KERNEL
 		sunxi_arisc_probe();
-#endif
 #endif
 #ifdef CONFIG_SUNXI_OTA_TURNNING
 		update_boot0_head_for_ota();
@@ -763,11 +758,6 @@ int board_late_init(void)
 #elif defined(CONFIG_SUNXI_REPLACE_FDT_FROM_PARTITION)
 		sunxi_replace_fdt();
 		sunxi_update_fdt_para_for_kernel();
-#endif
-#ifdef CONFIG_SUNXI_TV_FASTLOGO
-		if (p_fastlogo) {
-			p_fastlogo->reserve_memory(p_fastlogo);
-		}
 #endif
 	}
 	return 0;
@@ -889,7 +879,7 @@ void sunxi_update_subsequent_processing(int next_work)
 
 	case SUNXI_UPDATE_NEXT_ACTION_REUPDATE:
 		printf("SUNXI_UPDATE_NEXT_ACTION_REUPDATE\n");
-		sunxi_board_run_fel();
+		// sunxi_board_run_fel();
 		break;
 
 	case SUNXI_UPDATE_NEXT_ACTION_BOOT:

@@ -290,7 +290,6 @@ static inline void regwrite(void *dst, void *src, unsigned int n)
 #define SUPPORT_LVDS
 #define SUPPORT_COMBO_DPHY
 #define SUPPORT_DSI
-#define SUPPORT_HDMI
 #define CLK_NUM_PER_DSI 1
 #define DEVICE_DSI_NUM 1
 #define SUPPORT_LBC

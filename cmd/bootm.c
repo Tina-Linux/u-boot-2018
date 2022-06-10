@@ -226,7 +226,7 @@ int do_bootm(cmd_tbl_t *cmdtp, int flag, int argc, char * const argv[])
 	if (gd->securemode) {
 
 #if CONFIG_SUNXI_PART_VERIFY
-		pr_msg("begin to verify rootfs\n");
+		pr_msg("begin to verify rootfs");
 		int full = 0;
 		struct sunxi_image_verify_pattern_st verify_pattern = {
 			0x1000, 0x100000, -1

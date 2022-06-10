@@ -406,16 +406,15 @@ static void mmc_get_para_from_fex(int sdc_no)
 				MMCDBG("card0 try use io 3V.\n");
 			}
 		}
+		ret = sunxi_auto_pow_mode(5);
+		if (!ret)
+			cfg->io_is_1v8 = 0;
 
 		pin_default->pin_count = fdt_get_all_pin(nodeoffset, "pinctrl-0", pin_default->pin_set);
 			if (pin_default->pin_count <= 0) {
 				MMCINFO("get card0 default pin fail\n");
 				return ;
 		}
-
-		ret = sunxi_auto_pow_mode(pin_default->pin_set[0].port-1);
-		if (!ret)
-			cfg->io_is_1v8 = 0;
 
 		/*avoid the error print from fdt_get_all_pin*/
 		pin_disable->pin_count = fdt_getprop_u32(working_fdt, nodeoffset, "pinctrl-1", handle);
@@ -749,15 +748,15 @@ static void mmc_get_para_from_fex(int sdc_no)
 			}
 		}
 
+		ret = sunxi_auto_pow_mode(2);
+		if (!ret)
+			cfg->io_is_1v8 = 0;
+
 		pin_default->pin_count = fdt_get_all_pin(nodeoffset, "pinctrl-0", pin_default->pin_set);
 		if (pin_default->pin_count <= 0) {
 			MMCDBG("get card2 default pin fail\n");
 			return ;
 		}
-
-		ret = sunxi_auto_pow_mode(pin_default->pin_set[0].port-1);
-		if (!ret)
-			cfg->io_is_1v8 = 0;
 
 		/*avoid the error print from fdt_get_all_pin*/
 		pin_disable->pin_count = fdt_getprop_u32(working_fdt, nodeoffset, "pinctrl-1", handle);

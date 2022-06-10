@@ -179,8 +179,8 @@
 /* 80h -- 11h ~ 81h -- 10h*/
 #define RAWNAND_JEDEC_MULTI_WRITE	BIT(14)
 
-/* Device needs 2rd row address cycle */
-#define RAWNAND_ROW_ADDR_2	BIT(16)
+/* Device needs 3rd row address cycle */
+#define RAWNAND_ROW_ADDR_3	BIT(16)
 
 /* Default Toggle DDR1.0 , SDR need to set*/
 #define RAWNAND_TOGGLE_DDR_TO_SDR	BIT(29)
@@ -190,7 +190,6 @@
 
 
 /* Macros to identify the above */
-#define RAWNAND_HAS_ONLY_TWO_DDR(chip) ((chip->options & RAWNAND_ROW_ADDR_2))
 #define RAWNAND_HAS_ITF_SDR(chip) ((chip->options & RAWNAND_ITF_SDR))
 #define RAWNAND_HAS_ITF_ONFI_DDR(chip) ((chip->options & RAWNAND_ITF_ONFI_DDR))
 #define RAWNAND_HAS_ITF_ONFI_DDR2(chip) ((chip->options & RAWNAND_ITF_ONFI_DDR2))
@@ -231,10 +230,6 @@
 #define RAWNAND_MFR_MXIC	0xc2
 #define RAWNAND_MFR_FORESEE	0xec
 #define RAWNAND_MFR_WINBOND	0xef
-#define RAWNAND_MFR_FIDELIX	0xad
-#define RAWNAND_MFR_UNILC	0xc8
-#define RAWNAND_MFR_JSC		0xad
-#define RAWNAND_MFR_DOSILICON	0xf8
 
 /*
  * RAWNAND Flash Manufacture name
@@ -258,10 +253,6 @@
 #define TOSHIBA_NAME "toshiba"
 #define WINBOND_NAME "winbond"
 #define FORESEE_NAME "foresee"
-#define FIDELIX_NAME "fidelix"
-#define UNILC_NAME "unilc"
-#define JSC_NAME "jsc"
-#define DOSILICON_NAME "dosilicon"
 
 
 #define PE_CYCLES_1K	(1000)
@@ -316,17 +307,13 @@
 #define MAX_CHIPS (4U)
 enum error_management {
 /*first spare area location on first page of each block*/
-	PST_FIRST_PAGE = 0x1,
+	FIRST_PAGE = 0x1,
 /*first spare area location on first page and second page of each block*/
-	PST_FIRST_TWO_PAGES = 0x11,
+	FIRST_TWO_PAGES = 0x11,
 /*first spare area location on last page of each block*/
-	PST_LAST_PAGE = 0x2,
+	LAST_PAGE = 0x2,
 /*first spare area location on last two page of each block*/
-	PST_LAST_TWO_PAGES = 0x22,
-/*first spare area location on first and last page of each block*/
-	PST_FIRST_AND_LAST_PAGES = 0x4,
-/*first spare area location on first two and last page of each block*/
-	PST_FIRST_TWO_AND_LAST_PAGES = 0x8,
+	LAST_TWO_PAGES = 0x22,
 };
 
 struct aw_nand_flash_dev {

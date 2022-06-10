@@ -974,10 +974,6 @@ DTS_WARNNING_SKIP :=	-W no-unit_address_vs_reg \
 			-W no-unit_address_format \
 			-W no-simple_bus_reg \
 			-W no-pwms_property
-ifeq (x$(DEVICE_BOARD_DTS_EXIST), xyes)
-# add depend on external dts, make sure dts in uboot up to date
-dts/dt.dtb: $(LICHEE_BOARD_CONFIG_DIR)/uboot-board.dts
-endif
 
 all:		$(ALL-y) cfg
 ifeq ($(CONFIG_DM_I2C_COMPAT)$(CONFIG_SANDBOX),y)
@@ -1516,16 +1512,7 @@ include/config/uboot.release: include/config/auto.conf FORCE
 # version.h and scripts_basic is processed / created.
 
 # Listed in dependency order
-PHONY += prepare archprepare prepare0 prepare1 prepare2 prepare3 cfg
-
-CLEAN_FILES += board/sunxi/sunxi_challenge.c
-board/sunxi/sunxi_challenge.c:
-	@echo "  prepare sunxi_challenge..."
-	@dd if=/dev/urandom of=sunxi_challenge bs=128 count=1 > /dev/null 2>&1
-	@xxd -c 8 -i sunxi_challenge > board/sunxi/sunxi_challenge.c
-	@sed -i '/^unsigned/i __attribute__((__used__))' board/sunxi/sunxi_challenge.c
-	@rm sunxi_challenge
-prepare: board/sunxi/sunxi_challenge.c
+PHONY += prepare archprepare prepare0 prepare1 prepare2 prepare3
 
 # prepare3 is used to check if we are building in a separate output directory,
 # and if so do:

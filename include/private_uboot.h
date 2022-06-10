@@ -78,15 +78,7 @@ struct spare_boot_data_head
 	uint16_t                    key_input;
 	uint8_t                     secure_mode; /*update by update_uboot*/
 	uint8_t                     debug_mode;  /*update by update_uboot*/
-#if __SIZEOF_LONG__ == 8
-	/* for various security check, dont use directly, use with salt */
-	uint64_t                    challenge_offset;
-#elif __SIZEOF_LONG__ == 4
-	uint32_t                    challenge_offset;
-	uint32_t                    challenge_offset_pad;
-#else
-#error "invalid sizeof(long)"
-#endif
+	int                         reserved2[2];
 };
 
 struct spare_boot_ext_head

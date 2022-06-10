@@ -259,6 +259,18 @@ static struct spi_nor *mtd_to_spi_nor(struct mtd_info *mtd)
 	return mtd->priv;
 }
 
+#ifdef CONFIG_SPI_FLASH_EON
+static int enter_otp(struct spi_nor *nor)
+{
+	return nor->write_reg(nor, SPINOR_OP_ENTER_OTP, NULL, 0);
+}
+
+static int exit_otp(struct spi_nor *nor)
+{
+	return nor->write_reg(nor, SPINOR_OP_EXIT_OTP, NULL, 0);
+}
+#endif
+
 #ifndef CONFIG_SPI_FLASH_BAR
 static u8 spi_nor_convert_opcode(u8 opcode, const u8 table[][2], size_t size)
 {
@@ -1670,6 +1682,84 @@ static int gd_read_cr_quad_enable(struct spi_nor *nor)
 	return 0;
 }
 #endif
+#ifdef CONFIG_SPI_FLASH_EON
+static int read_cr_EON(struct spi_nor *nor)
+{
+	int ret;
+	u8 val;
+
+	ret = nor->read_reg(nor, SPINOR_OP_RDCR_EON, &val, 1);
+	if (ret < 0) {
+		dev_dbg(nor->dev, "error %d reading CR\n", ret);
+		return ret;
+	}
+
+	return val;
+}
+
+static int Eon_quad_enable(struct spi_nor *nor)
+{
+	int ret, val;
+	printf("EON device ID:%x,enable quad\n", JEDEC_ID(nor->info));
+	if ((JEDEC_ID(nor->info) == 0x7018) || (JEDEC_ID(nor->info) == 0x7017)) {
+		/*
+		 * EN25QH128A no QE bit,you should enter otp mode,
+		 * than you can see WXDIS bit on status register.
+		 * Set it and enable quad mode.
+		 */
+		enter_otp(nor);
+		val = read_sr(nor);
+		if (val < 0) {
+			exit_otp(nor);
+			return val;
+		}
+		if (val & SR_OTP_WXDIS_EN_EON) {
+			exit_otp(nor);
+			return 0;
+		}
+		write_enable(nor);
+		write_sr(nor, val | SR_OTP_WXDIS_EN_EON);
+
+		ret = spi_nor_wait_till_ready(nor);
+		if (ret) {
+			exit_otp(nor);
+			return ret;
+		}
+
+		ret = read_sr(nor);
+		if (!(ret > 0 && (ret & SR_OTP_WXDIS_EN_EON))) {
+			exit_otp(nor);
+			dev_err(nor->dev, "ESMT WXDIS bit not set\n");
+			return -EINVAL;
+		}
+
+		exit_otp(nor);
+
+	} else {
+		/*
+		 * other ESMT nor still enable quad mode by setting
+		 * QE bit,use 31h to write control register.
+		 *
+		 */
+		val = read_cr_EON(nor);
+		if (val < 0)
+			return val;
+		if (val & CR_QUAD_EN_EON)
+			return 0;
+
+		write_enable(nor);
+		write_sr2(nor, val | CR_QUAD_EN_EON);
+
+		ret = read_cr_EON(nor);
+		if (!(ret > 0 && (ret & CR_QUAD_EN_EON))) {
+			dev_err(nor->dev, "EON Quad bit not set\n");
+			return -EINVAL;
+		}
+	}
+	return 0;
+
+}
+#endif
 
 struct spi_nor_read_command {
 	u8			num_mode_clocks;
@@ -2395,6 +2485,11 @@ static int spi_nor_init_params(struct spi_nor *nor,
 		case SNOR_MFR_ZETTA:
 		case SNOR_MFR_BOYA:
 			params->quad_enable = gd_read_cr_quad_enable;
+			break;
+#endif
+#ifdef CONFIG_SPI_FLASH_EON
+		case SNOR_MFR_EON:
+			params->quad_enable = Eon_quad_enable;
 			break;
 #endif
 //		case SNOR_MFR_ST:

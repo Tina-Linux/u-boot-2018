@@ -205,7 +205,7 @@ static int mmc_config_delay(struct sunxi_mmc_priv *mmcpriv)
 
 	/*enable hw skew auto mode*/
 	rval = readl(&mmcpriv->reg->skew_ctrl);
-	/*rval &= ~(0xf);*/
+	rval &= ~(0xf);
 	rval |= (0x1<<4);
 	writel(rval, &mmcpriv->reg->skew_ctrl);
 
@@ -231,19 +231,15 @@ static int mmc_set_mod_clk(struct sunxi_mmc_priv *priv, unsigned int hz)
 	 * The MMC clock has an extra /2 post-divider when operating in the new
 	 * mode.
 	 */
-	if (mmc->speed_mode == HSDDR52_DDR50 ||
-			mmc->speed_mode == HS400)
-		mod_hz = hz * 4;/* 4xclk: DDR 4/8(HS); HS400; */
-	else
+	if (mmc->speed_mode == HSSDR52_SDR25)
 		mod_hz = hz * 2;/* 2xclk: SDR 1/4/8; */
+	else
+		mod_hz = hz * 4;/* 4xclk: DDR 4/8(HS); HS400; */
 	if (mod_hz <= 24000000) {
 		pll = CCM_MMC_CTRL_OSCM24;
 		pll_hz = 24000000;
 	} else {
-#ifdef CCM_MMC2_CTRL_PLL6X2
-		pll = CCM_MMC2_CTRL_PLL6X2;
-		pll_hz = clock_get_pll6() * 2 *1000000;
-#elif CCM_MMC_CTRL_PLL6X2
+#ifdef CCM_MMC_CTRL_PLL6X2
 		pll = CCM_MMC_CTRL_PLL6X2;
 		pll_hz = clock_get_pll6() * 2 *1000000;
 #else

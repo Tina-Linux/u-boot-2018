@@ -41,8 +41,6 @@
 #include <asm/arch/sid_sun8iw21.h>
 #elif defined(CONFIG_MACH_SUN50IW5)
 #include <asm/arch/sid_sun50iw5.h>
-#elif defined(CONFIG_MACH_SUN8IW11)
-#include <asm/arch/sid_sun8iw11.h>
 #else
 #error "platform not support"
 #endif

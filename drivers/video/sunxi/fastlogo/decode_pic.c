@@ -21,7 +21,6 @@
 #include <common.h>
 #include <bmp_layout.h>
 #include <malloc.h>
-#include <sys_partition.h>
 
 typedef struct rect {
 	int left;
@@ -29,42 +28,6 @@ typedef struct rect {
 	int right;
 	int bottom;
 } rect_t;
-
-#if defined(FASTLOGO_DEBUG) && defined(CONFIG_FAT_WRITE)
-extern int do_fat_fswrite(cmd_tbl_t *cmdtp, int flag, int argc,
-			  char *const argv[]);
-int save_file_to_local(struct raw_pic_t *p_raw)
-{
-	int partno = -1, ret = -1;
-	char *argv[6], file_addr[32];
-	char part_info[16] = { 0 }, size[32] = { 0 };
-	char file_name[32] = { 0 };
-
-	partno = sunxi_partition_get_partno_byname("bootloader");
-	if (partno < 0) {
-		pr_err("boot-resource is not found!\n");
-		goto OUT;
-	}
-	snprintf(part_info, 16, "0:%x", partno);
-	snprintf(file_name, 32, "rawfile_%ux%u.rgb", p_raw->width,
-		 p_raw->height);
-	sprintf(file_addr, "%lx", (unsigned long)p_raw->addr);
-	snprintf(size, 16, "%lx", (unsigned long)p_raw->file_size);
-	argv[0] = "fatwrite";
-	argv[1] = "sunxi_flash";
-	argv[2] = part_info;
-	argv[3] = file_addr;
-	argv[4] = file_name;
-	argv[5] = size;
-	if (do_fat_fswrite(0, 0, 6, argv)) {
-		pr_err("do_fat_fswrite fail!\n");
-	} else
-		ret = 0;
-
-OUT:
-	return ret;
-}
-#endif
 
 static int __print_info(struct raw_pic_t *p_raw)
 {
@@ -101,6 +64,9 @@ static int __bmp_decode(struct file_info_t *p_file, struct raw_pic_t *p_pic)
 	    pr_err("no support %d bit bmp\n", bmp->header.bit_count);
 	    goto OUT;
 	}
+
+	p_pic->addr = memalign(CONFIG_SYS_CACHELINE_SIZE,
+				p_pic->file_size);
 
 	src_width = bmp->header.width;
 	if (bmp->header.height & 0x80000000)
@@ -190,6 +156,12 @@ static int __jpeg_decode(struct file_info_t *p_file, struct raw_pic_t *p_pic)
 	    goto FREE;
 	}
 
+	p_pic->addr = memalign(CONFIG_SYS_CACHELINE_SIZE,
+				p_pic->file_size);
+	if (!p_pic->addr) {
+		pr_err("Malloc pic addr fail!\n");
+		goto FREE;
+	}
 
 	tinyjpeg_set_components(jdec, (unsigned char **)&(p_pic->addr), 1);
 
@@ -209,28 +181,6 @@ FREE:
 	tinyjpeg_free(jdec);
 #endif
 	return -1;
-}
-
-int decode_pic2(struct file_info_t *p_in_file, struct raw_pic_t *p_pic,
-		enum decode_type type)
-{
-	int ret = -1;
-
-	if (!p_in_file || !p_pic || !p_pic->addr) {
-		pr_err("NULL pointer!\n");
-		return ret;
-	}
-
-	if (type == BMP_DECODE_TYPE) {
-		ret = __bmp_decode(p_in_file, p_pic);
-	} else if (type == JPEG_DECODE_TYPE) {
-		ret = __jpeg_decode(p_in_file, p_pic);
-	} else {
-		memcpy(p_pic->addr, p_in_file->file_addr, p_in_file->file_size);
-		ret = 0;
-	}
-
-	return ret;
 }
 
 struct raw_pic_t *decode_pic(struct file_info_t *p_in_file,
@@ -256,27 +206,20 @@ struct raw_pic_t *decode_pic(struct file_info_t *p_in_file,
 	p_pic->bpp = p_out_arg->bpp;
 	p_pic->stride = p_out_arg->stride;
 	p_pic->file_size =
-		ALIGN(p_pic->stride * p_pic->height, 4096);
+		ALIGN(p_pic->stride * p_pic->height, CONFIG_SYS_CACHELINE_SIZE);
 
-	p_pic->addr = memalign(4096,
-				p_pic->file_size);
-	if (!p_pic->addr) {
-		pr_err("Malloc pic addr fail!\n");
-		goto FREE;
+	if (p_out_arg->type == BMP_DECODE_TYPE) {
+		ret = __bmp_decode(p_in_file, p_pic);
+		if (ret)
+			goto FREE;
+	} else if (p_out_arg->type == JPEG_DECODE_TYPE) {
+		ret = __jpeg_decode(p_in_file, p_pic);
+		if (ret)
+			goto FREE;
 	}
-	memset(p_pic->addr, 0, p_pic->file_size);
-
-	ret = decode_pic2(p_in_file, p_pic, p_out_arg->type);
-	if (ret)
-		goto FREE_RAW;
-#if defined(FASTLOGO_DEBUG) && defined(CONFIG_FAT_WRITE)
-	save_file_to_local(p_pic);
-#endif
 
 OUT:
 	return p_pic;
-FREE_RAW:
-	free(p_pic->addr);
 FREE:
 	free(p_pic);
 	return NULL;

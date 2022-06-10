@@ -28,14 +28,13 @@
 #include "version.h"
 #include "nand.h"
 #include "nand_boot.h"
-#include <sunxi_nand_errno.h>
+#include "nand_errno.h"
 #include "nand_nftl.h"
 #include "nand_physic_interface.h"
 #include "rawnand/rawnand_chip.h"
 #include "rawnand/controller/ndfc_base.h"
 #include "rawnand/controller/ndfc_ops.h"
-/*#include "rawnand/rawnand.h"*/
-#include <sunxi_nand.h>
+#include "rawnand/rawnand.h"
 #include "rawnand/rawnand_base.h"
 #include "rawnand/rawnand_debug.h"
 

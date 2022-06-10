@@ -212,12 +212,6 @@ config SUNXI_CUSTOMER_RESERVED_ID
 	help
 		set customer reserved id value
 
-config START_MODE_RTC_REG_INDEX
-	hex "homtlet/tv boot mode reg"
-	default 0x2
-	---help---
-	specific reg stored homtlet/tv start mode flag
-
 if SUNXI_HDCP_IN_SECURESTORAGE
 config SUNXI_HDCP_HASH
 	bool "hdcp key hash process"

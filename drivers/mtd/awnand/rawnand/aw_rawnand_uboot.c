@@ -16,7 +16,7 @@
 #include <linux/mtd/aw-ubi.h>
 
 
-#define VERSION "v1.21 2021-09-29 10:50"
+#define VERSION "v1.13 2021-04-28 16:08"
 
 void DISPLAY_VERSION(void)
 {
@@ -146,7 +146,8 @@ static int rawnand_erase_block(int start, int end)
 		ret = chip->erase(mtd, page_in_chip);
 #endif
 		if (ret) {
-			awrawnand_err("erase block@%d fail\n", blk);
+			awrawnand_err("erase start_block@%d end_block@%d fail in block@%d\n", start, end, blk);
+			break;
 		}
 		blk++;
 #if SIMULATE_MULTIPLANE

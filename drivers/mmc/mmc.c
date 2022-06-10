@@ -3794,7 +3794,6 @@ int mmc_init(struct mmc *mmc)
 			MMCINFO("%s: mmc init fail, err %d\n", __FUNCTION__, err);
 			goto ERR_RET;
 		}
-
 		if (work_mode == WORK_MODE_BOOT && cfg->sample_mode == AUTO_SAMPLE_MODE) {
 			if (cfg->force_boot_tuning)
 				need_tuning = 1;
@@ -3802,23 +3801,8 @@ int mmc_init(struct mmc *mmc)
 				if (((priv_info->ext_para0 & 0xFF000000) == EXT_PARA0_ID)
 					&& (priv_info->ext_para0 & EXT_PARA0_TUNING_SUCCESS_FLAG))
 					MMCDBG("%s: tuning procedure is executed!\n", __FUNCTION__);
-				else {
-
-					/* if boot0 didn't read mmc parameter or have any other problems, try to read it here.*/
-					err = mmc_read_info(priv->mmc_no, NULL,
-					  SUNXI_SDMMC_PARAMETER_REGION_SIZE_BYTE - sizeof(struct sunxi_sdmmc_parameter_region_header), (void *)priv_info);
-					if (err) {
-						MMCINFO("%s: read mmc parameter fail, err %d\n", __FUNCTION__, err);
-						need_tuning = 1;
-					} else if (((priv_info->ext_para0 & 0xFF000000) == EXT_PARA0_ID)
-					&& (priv_info->ext_para0 & EXT_PARA0_TUNING_SUCCESS_FLAG)) {
-						need_tuning = 0;
-						MMCDBG("%s: read mmc parameter ok\n", __FUNCTION__);
-					} else {
-						need_tuning = 1;
-					}
-				}
-
+				else
+					need_tuning = 1;
 			}
 
 			if (need_tuning) {

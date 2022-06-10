@@ -16,7 +16,6 @@
 #include <smc.h>
 #include <private_uboot.h>
 #include <sunxi_verify_boot_info.h>
-#include <sys_partition.h>
 #ifdef CONFIG_SUNXI_IMAGE_HEADER
 #include <asm/arch/efuse.h>
 #include <sunxi_image_header.h>
@@ -475,6 +474,7 @@ static int cal_partioin_len(disk_partition_t *info)
 int sunxi_verify_partion(struct sunxi_image_verify_pattern_st *pattern,
 			const char *part_name, const char *cert_name, int full)
 {
+	struct blk_desc *desc;
 	int ret = 0;
 	disk_partition_t info = { 0 };
 	int i;
@@ -485,11 +485,12 @@ int sunxi_verify_partion(struct sunxi_image_verify_pattern_st *pattern,
 	uint64_t part_len;
 	uint32_t whole_sample_len;
 
-	if (sunxi_partition_get_info(part_name, &info)) {
-		printf("get part: %s info failed\n", part_name);
+	desc = blk_get_devnum_by_typename("sunxi_flash", 0);
+	if (desc == NULL)
 		return -ENODEV;
-	}
 
+	if (sunxi_flash_try_partition(desc, part_name, &info) < 0)
+		return -ENODEV;
 	part_len = cal_partioin_len(&info);
 
 	if (full == 1) {
@@ -733,8 +734,6 @@ int sunxi_verify_dsp(ulong img_addr, u32 image_len, u32 dsp_id)
 			if (sunxi_image_verify(img_addr, cert_name) != 0) {
 				pr_error("dsp %s verify failed\n", cert_name);
 				return -1;
-			} else {
-				printf("dsp %d verify success!\n", dsp_id);
 			}
 		} else {
 			pr_error("not find sunxi_image_header\n");
@@ -842,11 +841,7 @@ int sunxi_image_verify(ulong os_load_addr, const char *cert_name)
 	uint8_t sign_of_hash[32] = {0};
 
 	sunxi_image_header_t *ih = (sunxi_image_header_t *)src;
-	sunxi_tlv_header_t tlv_tmp = {0};
-	sunxi_tlv_header_t *tlv = &tlv_tmp; //(sunxi_tlv_header_t *)(src + ih->ih_hsize + ih->ih_psize);
-
-
-	memcpy(tlv, src + ih->ih_hsize + ih->ih_psize, sizeof(sunxi_tlv_header_t));
+	sunxi_tlv_header_t *tlv = (sunxi_tlv_header_t *)(src + ih->ih_hsize + ih->ih_psize);
 
 	ret = sunxi_tlv_header_check(tlv);
 	if (ret) {

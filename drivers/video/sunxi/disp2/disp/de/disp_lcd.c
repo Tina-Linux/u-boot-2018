@@ -1120,6 +1120,21 @@ static s32 disp_lcd_speed_limit(disp_panel_para *panel, u32 *min_dclk,
 	switch (markid) {
 	case 0x3c00: /*A53*/
 	{
+		/*ic version e*/
+		if ((ic_ver >= 4) && (!display_cfg_flag) &&
+		    (panel->lcd_if != LCD_IF_DSI)) {
+			/*only support DSI*/
+			*min_dclk = 9999;
+			*max_dclk = 0;
+			goto OUT;
+		}
+
+		if ((ic_ver == 0) && (panel->lcd_if == LCD_IF_DSI)) {
+			/*not support DSI*/
+			*min_dclk = 9999;
+			*max_dclk = 0;
+			goto OUT;
+		}
 
 		if (panel->lcd_if == LCD_IF_DSI) {
 			if (qa_val == 0)
@@ -1132,9 +1147,12 @@ static s32 disp_lcd_speed_limit(disp_panel_para *panel, u32 *min_dclk,
 			/*ic version after e*/
 			if (ic_ver >= 4)
 				*min_dclk = 0;
+		} else {
+			/*LVDS or RGB*/
+			*min_dclk = 40; /*1024*600@60*/
 		}
 
-		*max_dclk = 200; /*1280*720@60*/
+		*max_dclk = 85; /*1280*720@60*/
 	} break;
 	case 0x0400: /*A100*/
 	{
@@ -1149,6 +1167,9 @@ static s32 disp_lcd_speed_limit(disp_panel_para *panel, u32 *min_dclk,
 			/*ic version after e*/
 			if (ic_ver >= 4)
 				*min_dclk = 0;
+		} else {
+			/*LVDS or RGB*/
+			*min_dclk = 40; /*1024*600@60*/
 		}
 
 		*max_dclk = 85; /*1280*720@60*/
@@ -1192,10 +1213,11 @@ OUT:
 	tick_printf(
 		"soc ic_ver:0x%x, qa_val:0x%x, markid:0x%x dclk[%u-%u] display_cfg_flag:%d\n",
 		ic_ver, qa_val, markid, *min_dclk, *max_dclk, display_cfg_flag);
-#endif
-
+	return 1;
+#else
 	/*unlimit */
 	return 0;
+#endif
 }
 
 static s32 disp_lcd_tcon_enable(struct disp_device *lcd)

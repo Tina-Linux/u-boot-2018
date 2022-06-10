@@ -323,7 +323,7 @@ int aw_rawnand_chip_erase(struct mtd_info *mtd, int page)
 	status = chip->dev_status(mtd);
 
 	if (status & RAWNAND_STATUS_FAIL) {
-		ret = -EIO;
+		ret = 0;
 		awrawnand_err("%s erase block@%d fail\n", __func__, page >> chip->pages_per_blk_shift);
 	}
 	awrawnand_chip_trace("Exit %s ret@%d\n", __func__, ret);
@@ -374,7 +374,7 @@ int aw_rawnand_chip_real_multi_erase(struct mtd_info *mtd, int page)
 	status = chip->dev_status(mtd);
 
 	if (status & RAWNAND_STATUS_FAIL) {
-		ret = -EIO;
+		ret = 0;
 		awrawnand_err("%s erase block@%d fail\n", __func__, page >> chip->pages_per_blk_shift);
 	}
 	awrawnand_chip_trace("Exit %s ret@%d\n", __func__, ret);
@@ -434,7 +434,7 @@ int aw_rawnand_chip_real_onfi_multi_erase(struct mtd_info *mtd, int page)
 	status = chip->dev_status(mtd);
 
 	if (status & RAWNAND_STATUS_FAIL) {
-		ret = -EIO;
+		ret = 0;
 		awrawnand_err("%s erase block@%d fail\n", __func__, page >> chip->pages_per_blk_shift);
 	}
 
@@ -1070,7 +1070,6 @@ static bool aw_rawnand_is_valid_id(uint8_t id)
 	/*case RAWNAND_MFR_MXIC:*/ /*the same MACRONIX*/
 	/*case RAWNAND_MFR_FORESEE:*/ /*the same SAMSUNG*/
 	case RAWNAND_MFR_WINBOND:
-	case RAWNAND_MFR_DOSILICON:
 		ret = true;
 		break;
 	default:
@@ -1940,11 +1939,7 @@ static int aw_rawnand_chip_data_init(struct mtd_info *mtd)
 	chip->data_interface.type = aw_rawnand_get_itf_type(chip);
 
 	chip->random = RAWNAND_NFC_NEED_RANDOM(chip);
-
-	if (RAWNAND_HAS_ONLY_TWO_DDR(chip))
-		chip->row_cycles = 2;
-	else
-		chip->row_cycles = 3;
+	chip->row_cycles = 3;
 	chip->badblock_mark_pos = dev->badblock_flag_pos;
 
 	bbtsize = ((chip->chips * chip->chipsize) >> chip->erase_shift);
@@ -2007,7 +2002,6 @@ static int aw_rawnand_chip_data_init(struct mtd_info *mtd)
 
 	mutex_init(&chip->lock);
 
-	awrawnand_info("chip: row_cycles@%d\n", chip->row_cycles);
 	awrawnand_info("chip: chip_shift@%d\n", chip->chip_shift);
 	awrawnand_info("chip: pagesize_mask@%d\n", chip->pagesize_mask);
 	awrawnand_info("chip: chip_pages@%d\n", chip->chip_pages);

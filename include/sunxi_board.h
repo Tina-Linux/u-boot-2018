@@ -163,7 +163,6 @@ extern u32 get_pmu_byte_from_boot0(void);
 extern int sunxi_get_active_boot0_id(void);
 
 extern int mmc_request_update_boot0(int dev_num);
-extern int mmc_read_info(int dev_num, void *buffer, u32 buffer_size, void *priv_info);
 extern int mmc_write_info(int dev_num, void *buffer, u32 buffer_size);
 
 extern int get_debugmode_flag(void);

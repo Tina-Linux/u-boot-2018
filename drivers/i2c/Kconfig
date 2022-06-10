@@ -622,13 +622,6 @@ config AXP2202_SUNXI_I2C_SLAVE
 	default 0
 	help
 	 Sunxi AXP2202 I2C Slave
-
-config AXP221_SUNXI_I2C_SLAVE
-	hex "AXP221 I2C Slave"
-	depends on R_I2C0_ENABLE && AXP221_POWER
-	default 0
-	help
-	 Sunxi AXP221 I2C Slave
 endif
 
 

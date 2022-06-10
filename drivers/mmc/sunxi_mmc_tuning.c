@@ -833,92 +833,6 @@ static int sunxi_tuning_speed_mode(struct mmc *mmc, int speed_mode, int tuning_m
 	return ret;
 }
 
-int write_tuning_try_freq_tm5(struct mmc *mmc)
-{
-	int ret = 0;
-	char *rcv_pattern = NULL;
-	char *std_pattern = NULL;
-	int pat_blk_cnt = 0;
-
-	rcv_pattern = (char *)memalign(CONFIG_SYS_CACHELINE_SIZE, TUNING_LEN * 512);
-	if (rcv_pattern == NULL) {
-		MMCDBG("%s: request memory for rcv_pattern fail\n", __FUNCTION__);
-		return -1;
-	}
-
-	std_pattern = (char *)memalign(CONFIG_SYS_CACHELINE_SIZE, TUNING_LEN * 512);
-	if (std_pattern == NULL) {
-		MMCDBG("%s: request memory for std_pattern fail\n", __FUNCTION__);
-		ret = -1;
-		goto out1;
-	}
-
-	if (mmc->bus_width == 4) {
-		//std_pattern = tuning_blk_4b;
-		memcpy(std_pattern, tuning_blk_4b, (TUNING_LEN*512));
-		pat_blk_cnt = tuning_blk_cnt_4b;
-		MMCDBG("Using 4 bit tuning now\n");
-	} else if (mmc->bus_width == 8) {
-		//std_pattern = tuning_blk_8b;
-		memcpy(std_pattern, tuning_blk_8b, (TUNING_LEN*512));
-		pat_blk_cnt = tuning_blk_cnt_8b;
-		MMCDBG("Using 8 bit tuning now\n");
-	} else if (mmc->bus_width == 1) {
-		MMCDBG("Don't support 1 bit tuning now\n");
-		ret = -1;
-		goto out;
-	}
-
-	ret = mmc_bwrite(mmc_get_blk_desc(mmc),
-			TUNING_ADD,
-			pat_blk_cnt,
-			std_pattern);
-	MMCDBG("Write pattern ret = %d\n", ret);
-	if (ret != pat_blk_cnt) { //fail
-		MMCMSG(mmc, "write failed\n");
-		if (pat_blk_cnt > 1) {
-			MMCDBG("send stop\n");
-			mmc_send_manual_stop(mmc);
-		}
-		ret = -1;
-		goto out;
-	} else {//ok
-		MMCDBG("write_tuning_try_freq: write ok\n");
-
-		/* read pattern and compare with the pattern show sent*/
-		ret = mmc_bread(mmc_get_blk_desc(mmc),
-				TUNING_ADD,
-				pat_blk_cnt,
-				rcv_pattern);
-		if (ret != pat_blk_cnt) {
-			MMCDBG("read failed\n");
-
-			/*if read failed and block len>1,send stop for next try*/
-			if (pat_blk_cnt > 1) {
-				MMCDBG("Send stop\n");
-				mmc_send_manual_stop(mmc);
-			}
-			ret = -1;
-			goto out;
-		} else {
-			ret = memcmp(std_pattern, rcv_pattern, pat_blk_cnt * 512);
-			if (ret) {
-				MMCDBG("pattern compare fail\n");
-				return -1;
-			} else {
-				MMCDBG("Pattern compare ok\n");
-				MMCDBG("Write tuning pattern ok\n");
-			}
-		}
-	}
-
-out:
-	free(std_pattern);
-out1:
-	free(rcv_pattern);
-	return 0;
-}
-
 static int sunxi_tuning_speed_mode_tm5(struct mmc *mmc, int speed_mode, int tuning_mode, int retry_times)
 {
 	int freq_index = 0, freq = 0;
@@ -967,14 +881,6 @@ static int sunxi_tuning_speed_mode_tm5(struct mmc *mmc, int speed_mode, int tuni
 					sdly_cfg[speed_mode*MAX_CLK_FREQ_NUM + freq_index] = sdly;
 				/* update sample point cfg */
 				mmc_set_clock(mmc, mmc->tran_speed, false);
-
-				if (speed_mode == HS400) {
-					ret = write_tuning_try_freq_tm5(mmc);
-					if (ret) {
-						p[freq_index*sdly_cnt + sdly] = 0;
-						continue;
-					}
-				}
 				//MMCINFO("mmc set clock %d\n", mmc->tran_speed);
 				if (tuning_mode == 0) {
 					if (!sunxi_tuning_method_0(mmc, retry_times))
@@ -1168,7 +1074,6 @@ int sunxi_need_rty(struct mmc *mmc)
 
 	return -1;
 }
-
 
 int write_tuning_try_freq(struct mmc *mmc, u32 clk)
 {
@@ -1753,116 +1658,6 @@ int mmc_request_update_boot0(int dev_num)
 	/*no need to update boot0 when ota or programmer*/
 	return 0;
 #endif
-}
-
-/*
- * mmc_read_info : read timing info to specific area
- *
- * @dev_num:card number
- * @buffer: don't care
- * @buffer_size: < SUNXI_SDMMC_PARAMETER_REGION_SIZE_BYTE - sizeof(struct sunxi_sdmmc_parameter_region_header)
- * @info: sdmmc private info
- *
- * */
-int mmc_read_info(int dev_num, void *buffer, u32 buffer_size, void *info)
-{
-	struct mmc *mmc = find_mmc_device(dev_num);
-	//int work_mode = uboot_spare_head.boot_data.work_mode;
-	struct sunxi_sdmmc_parameter_region *pregion = NULL;
-	struct boot_sdmmc_private_info_t *priv_info = (struct boot_sdmmc_private_info_t *)info;
-	unsigned char *pregion_r = NULL;
-	int i = 0;
-	u32 sum = 0;
-	u32 add_sum = 0;
-	int ret = 0;
-	int retry_write = 0;
-	int retry_read = 0;
-
-	if (mmc == NULL) {
-		MMCINFO("%s:Can not find mmc\n", __FUNCTION__);
-		return -1;
-	}
-
-	if (buffer_size > (SUNXI_SDMMC_PARAMETER_REGION_SIZE_BYTE - sizeof(struct sunxi_sdmmc_parameter_region_header)))
-		buffer_size = (SUNXI_SDMMC_PARAMETER_REGION_SIZE_BYTE - sizeof(struct sunxi_sdmmc_parameter_region_header));
-
-	pregion_r = memalign(512, SUNXI_SDMMC_PARAMETER_REGION_SIZE_BYTE);
-	if (pregion_r == NULL) {
-		MMCINFO("%s malloc pregion fail\n", __func__);
-		goto error;
-	} else {
-		memset(pregion_r, 0x0, SUNXI_SDMMC_PARAMETER_REGION_SIZE_BYTE);
-		pregion = (struct sunxi_sdmmc_parameter_region *)pregion_r;
-	}
-
-mmc_read_retry:
-
-	ret = mmc_bread(mmc_get_blk_desc(mmc), SUNXI_SDMMC_PARAMETER_REGION_LBA_START,
-			SUNXI_SDMMC_PARAMETER_REGION_SIZE_BYTE >> 9, pregion_r);
-	if (ret < 0) {
-		MMCINFO("%s %d mmc read parameter region fail %s \n", __func__, __LINE__,
-				(retry_write < 3) ? "retry more time" : "go err");
-		if (retry_write < 3) {
-			retry_write++;
-			goto mmc_read_retry;
-		} else
-			goto error;
-	}
-
-	/*check magic and sum*/
-	 if (pregion->header.magic == SDMMC_PARAMETER_MAGIC) {
-		 /*add_sum don't participate in check sum verificaton*/
-		 add_sum = pregion->header.add_sum;
-		 pregion->header.add_sum = 0;
-		 sum = 0;
-		 for (i = 0; i < pregion->header.length; i++) {
-			sum += ((unsigned char *)pregion_r)[i];
-		 }
-
-		 if (sum != add_sum) {
-			printf("%s %d:region add sum(%x) is not right(%x), %s \n",
-								 __func__, __LINE__, sum, add_sum,
-								 (retry_read < 3) ? "retry more time" : "go err");
-			if (retry_read < 3) {
-				 retry_read++;
-				 goto mmc_read_retry;
-			} else
-				 goto error;
-		 }
-	 } else {
-		printf("%s %d:region magic is not right, %s %x\n", __func__, __LINE__,
-						 (retry_read < 3) ? "retry more time" : "go err", pregion->header.magic);
-		 if (retry_read < 3) {
-				 retry_read++;
-				 goto mmc_read_retry;
-		 } else {
-				 dumphex32("info", (char *)pregion_r, 16);
-				 goto error;
-		 }
-	 }
-
-	MMCINFO("read mmc %d info ok\n", dev_num);
-
-	memcpy((void *)priv_info, (void *)&pregion->info, sizeof(struct boot_sdmmc_private_info_t));
-	free(pregion_r);
-
-	if (mmc->cfg->sample_mode == AUTO_SAMPLE_MODE) {
-		if ((sizeof(struct tune_sdly)+64) > buffer_size) { /* 64byte is resvered for other information */
-			MMCINFO("size of tuning_sdly over %d\n", buffer_size);
-		} else
-			memcpy((void *)&mmc->cfg->sdly.tm4_smx_fx[0],
-				&priv_info->tune_sdly.tm4_smx_fx[0], sizeof(struct tune_sdly));
-	} else {
-		/* fill invalid information "0xff" */
-		memset((void *)&mmc->cfg->sdly.tm4_smx_fx[0], 0xff, sizeof(struct tune_sdly));
-	}
-
-	return 0;
-
-error:
-	free(pregion_r);
-
-	return -1;
 }
 
 /*

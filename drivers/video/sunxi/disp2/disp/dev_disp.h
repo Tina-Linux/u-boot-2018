@@ -18,9 +18,6 @@
 #define __DEV_DISP_H__
 
 #include "de/bsp_display.h"
-#if defined(SUPPORT_HDMI) && defined(CONFIG_HDMI_DISP2_SUNXI)
-#include "../hdmi/drv_hdmi_i.h"
-#endif
 
 #if defined(SUPPORT_TV) && defined(CONFIG_HDMI_DISP2_SUNXI)
 #include "../tv/drv_tv.h"
@@ -204,7 +201,6 @@ extern s32 disp_unregister_standby_func(int (*suspend)(void), int (*resume)(void
 extern s32 composer_init(disp_drv_info *psg_disp_drv);
 extern unsigned int composer_dump(char* buf);
 extern s32 disp_tv_register(struct disp_tv_func * func);
-extern s32 disp_set_hdmi_detect(bool hpd);
 
 extern disp_drv_info    g_disp_drv;
 
@@ -217,7 +213,6 @@ extern s32 fb_exit(void);
 #endif
 extern int lcd_init(void);
 extern s32 bsp_disp_get_fps(u32 disp);
-s32 disp_set_hdmi_func(struct disp_device_func * func);
 #if defined(__LINUX_PLAT__)
 s32 sunxi_get_fb_addr_para(struct __fb_addr_para *fb_addr_para);
 s32 fb_draw_colorbar(char* base, u32 width, u32 height, struct fb_var_screeninfo *var);

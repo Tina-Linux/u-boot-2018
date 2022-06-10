@@ -87,7 +87,7 @@ struct file_info_t *load_file(char *name, char *part_name)
 	file->path = (char *)malloc(strlen(part_name) + 1);
 	strncpy(file->path, part_name, strlen(part_name) + 1);
 	file->file_addr =
-		memalign(4096, file->file_size);
+		memalign(CONFIG_SYS_CACHELINE_SIZE, file->file_size);
 
 	sprintf(file_addr, "%lx", (unsigned long)file->file_addr);
 	snprintf(size, 16, "%lx", (unsigned long)file->file_size);

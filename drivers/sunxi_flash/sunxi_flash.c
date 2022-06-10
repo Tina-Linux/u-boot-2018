@@ -384,17 +384,14 @@ int sunxi_flash_init_ext(void)
 
 	tick_printf("workmode = %d,storage type = %d\n", workmode, storage_type);
 
-	if (workmode == WORK_MODE_USB_DEBUG) {
-		return 0;
-	} else if (workmode == WORK_MODE_BOOT ||
-		   workmode == WORK_MODE_SPRITE_RECOVERY) {
+	if (workmode == WORK_MODE_BOOT ||
+	    workmode == WORK_MODE_SPRITE_RECOVERY) {
 		state = sunxi_flash_boot_init(storage_type, workmode);
 	} else if ((workmode & WORK_MODE_PRODUCT) || (workmode == 0x30)) {
 		state = sunxi_flash_probe();
 	} else if (workmode & WORK_MODE_UPDATE) {
 	} else {
 	}
-
 	//init blk dev
 	sunxi_flash_init_blk();
 

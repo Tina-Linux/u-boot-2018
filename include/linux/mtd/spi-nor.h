@@ -34,6 +34,7 @@
 #define SNOR_MFR_XTX		0x0b
 #define SNOR_MFR_BOYA		0x68
 #define SNOR_MFR_FM		0xa1
+#define SNOR_MFR_EON		0x1c
 
 /*
  * Note on opcode nomenclature: some opcodes have a format like
@@ -124,6 +125,12 @@
 #define SPINOR_OP_RD_EVCR      0x65    /* Read EVCR register */
 #define SPINOR_OP_WD_EVCR      0x61    /* Write EVCR register */
 
+/* used for EON flash*/
+#define SPINOR_OP_RDCR_EON	0x09	/* Read EON configuration register */
+#define SPINOR_OP_EXIT_OTP	0x04	/* exit otp mode*/
+#define SPINOR_OP_ENTER_OTP	0x3a	/* enter otp mode*/
+#define SR_OTP_WXDIS_EN_EON	BIT(6)  /* status register WXDIS*/
+
 /* Used for individual lock*/
 #define SPINOR_OP_IBLK          0x36    /* Lock individual block */
 #define SPINOR_OP_UIBLK         0x39    /* Unlock individual block */
@@ -162,6 +169,7 @@
 #define CR_QUAD_EN_SPAN		BIT(1)	/* Spansion Quad I/O */
 #define CR_QUAD_EN_PUYA		BIT(1)	/* Puya Quad I/O */
 #define CR_QUAD_EN_GD			BIT(1)	/* Gd Quad I/O */
+#define CR_QUAD_EN_EON		BIT(1)	/* EON Quad I/O */
 
 /* Status Register 2 bits. */
 #define SR2_QUAD_EN_BIT7	BIT(7)

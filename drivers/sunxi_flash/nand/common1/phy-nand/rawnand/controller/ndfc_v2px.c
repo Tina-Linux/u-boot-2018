@@ -12,8 +12,7 @@
 #include "../rawnand_cfg.h"
 #include "../rawnand_debug.h"
 #include "ndfc_ops.h"
-/*#include "../rawnand.h"*/
-#include <sunxi_nand.h>
+#include "../rawnand.h"
 
 #define NDFC_VERSION_2 (0X02)
 

@@ -77,7 +77,6 @@ int (*set_charge_current_limit)(int current); /*Set the current charge size*/
 int (*reset_capacity)(void);
 unsigned char (*get_reg_value)(unsigned char reg_addr);/*get register value*/
 unsigned char (*set_reg_value)(unsigned char reg_addr, unsigned char reg_value);/*set register value*/
-int (*set_ntc_onoff)(int onoff); /* set ntc onoff, default on */
 };
 
 #define U_BOOT_AXP_BMU_INIT(_name)                                             \
@@ -117,7 +116,7 @@ int bmu_set_charge_current_limit(int current);
 int bmu_reset_capacity(void);
 unsigned char bmu_get_reg_value(unsigned char reg_addr);
 unsigned char bmu_set_reg_value(unsigned char reg_addr, unsigned char reg_value);
-int bmu_set_ntc_onoff(int onoff);
+
 int axp_probe(void);
 
 #endif /* __AXP_H__ */

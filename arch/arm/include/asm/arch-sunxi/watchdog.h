@@ -28,8 +28,7 @@ struct sunxi_wdog {
 #elif defined(CONFIG_MACH_SUN4I) || \
     defined(CONFIG_MACH_SUN5I) || \
     defined(CONFIG_MACH_SUN7I) || \
-    defined(CONFIG_MACH_SUN8I_R40) || \
-    defined(CONFIG_MACH_SUN8IW11)
+    defined(CONFIG_MACH_SUN8I_R40)
 
 #define WDT_MODE_EN		(0x1 << 0)
 #define WDT_MODE_RESET_EN	(0x1 << 1)

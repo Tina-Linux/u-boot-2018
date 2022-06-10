@@ -8,7 +8,7 @@ obj-$(CONFIG_DISP2_SUNXI) += disp.o
 
 disp-objs	:= dev_disp.o disp_sys_intf.o
 disp-objs	+= de/disp_display.o de/disp_features.o de/disp_device.o de/disp_lcd.o de/disp_manager.o de/disp_private.o \
-			   de/disp_smart_backlight.o de/disp_enhance.o de/disp_capture.o de/disp_hdmi.o de/disp_tv.o  de/disp_vga.o de/disp_vdevice.o \
+			   de/disp_smart_backlight.o de/disp_enhance.o de/disp_capture.o de/disp_tv.o  de/disp_vga.o de/disp_vdevice.o \
 			   de/disp_edp.o
 
 disp-$(CONFIG_EINK_PANEL_USED) += de/disp_eink_manager.o de/eink_pipeline_manager.o

@@ -74,8 +74,7 @@ timing mode
 #define ERR_NO_BEST_DLY (2)
 
 /* need malloc low len when flush unaligned addr cache */
-#if  defined (CONFIG_MACH_SUN8IW18) || defined (CONFIG_MACH_SUN8IW19) || \
-	(defined (CONFIG_MACH_SUN8IW20) && (CONFIG_SUNXI_MALLOC_LEN < 0x3700000))
+#if  defined (CONFIG_MACH_SUN8IW18) || defined (CONFIG_MACH_SUN8IW19)
 #define SUNXI_MMC_MALLOC_LOW_LEN	(4 << 20)
 #else
 #define SUNXI_MMC_MALLOC_LOW_LEN        (16 << 20)

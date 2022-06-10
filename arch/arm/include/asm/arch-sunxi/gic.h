@@ -72,8 +72,6 @@
 #define AW_IRQ_USB_OTG                 64
 #define AW_IRQ_USB_EHCI0               62
 #define AW_IRQ_USB_OHCI0               63
-#define AW_IRQ_USB_EHCI1               65
-#define AW_IRQ_USB_OHCI1               66
 #define AW_IRQ_DMA                     77
 #define AW_IRQ_TIMER0                  83
 #define AW_IRQ_TIMER1                  84
@@ -98,11 +96,9 @@
 #define AW_IRQ_USB_OTG					64
 #define AW_IRQ_USB_EHCI0				62
 #define AW_IRQ_USB_OHCI0				63
-#define AW_IRQ_USB_EHCI1				65
-#define AW_IRQ_USB_OHCI1				66
 #define AW_IRQ_DMA						82
-#define AW_IRQ_TIMER0					80
-#define AW_IRQ_TIMER1					81
+#define AW_IRQ_TIMER0					91
+#define AW_IRQ_TIMER1					92
 #define AW_IRQ_NMI						120
 #define GIC_IRQ_NUM                    (191)
 
@@ -157,19 +153,6 @@
 #define AW_IRQ_TIMER1                  (93)
 #define AW_IRQ_NMI                     (136)
 #define GIC_IRQ_NUM                    (179)
-
-#elif defined(CONFIG_MACH_SUN8IW11)
-
-#define AW_IRQ_NAND                    69
-#define AW_IRQ_USB_OTG                 70
-#define AW_IRQ_USB_EHCI0               71
-#define AW_IRQ_USB_OHCI0               72
-#define AW_IRQ_DMA                     59
-#define AW_IRQ_TIMER0                  54
-#define AW_IRQ_TIMER1                  55
-#define AW_IRQ_NMI                     32
-#define AW_IRQ_CIR                     118
-#define GIC_IRQ_NUM                   133
 
 #elif defined(CONFIG_MACH_SUN8IW7)
 

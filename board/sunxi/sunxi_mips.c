@@ -12,11 +12,8 @@
 #include <sys_partition.h>
 #include <memalign.h>
 #include <sunxi_image_verifier.h>
-#include <openssl_ext.h>
 #include <securestorage.h>
 #include "usb.h"
-#include <asm/arch/clock.h>
-#include "sunxi_challenge.h"
 
 #define DEBUG_PRINT 0
 
@@ -87,7 +84,7 @@ static void load_setting_from_fdt(struct mips_data_info_t *info, int index)
 		strcpy(tmp_name, info->file_name);
 
 		snprintf(info->cert_name, sizeof(info->cert_name), "%s%s%s",
-			 tmp_name, projectID_name, ".der");
+			 tmp_name, projectID_name, ".crt");
 		info->flag &= ~CERT_NAME_NOT_FOUNT;
 
 		snprintf(info->file_name, sizeof(info->file_name), "%s%s%s",
@@ -106,17 +103,6 @@ static void load_setting_from_fdt(struct mips_data_info_t *info, int index)
 	pr_err(" flag		:%x\n", info->flag);
 #endif
 }
-
-enum USB_VERIFY_ST_t {
-	NOT_DONE,
-	/*
-	 * order db->db_table->db_project if critical
-	 * since *end of first one if *start of next one
-	 */
-	PASS,
-	FAILED
-};
-static enum USB_VERIFY_ST_t usb_key_valid;
 
 enum read_source_en {
 	FROM_PART,
@@ -159,7 +145,6 @@ static int prepare_read_argv(struct read_param_t *read_argv)
 			read_argv[FROM_USB].cmd = "fatload";
 			strcpy(read_argv[FROM_USB].interface, "usb");
 			snprintf(read_argv[FROM_USB].dev, 16, "0");
-			usb_key_valid = NOT_DONE;
 		} else {
 			/*no usb storage found, disable usb_debug to skip useless try*/
 			usb_debug_enabled = 0;
@@ -167,44 +152,6 @@ static int prepare_read_argv(struct read_param_t *read_argv)
 	}
 #endif
 	return 0;
-}
-
-static void verify_usb_key(struct read_param_t *read_argv)
-{
-	char *tmp_argv[6];
-	unsigned char *key_buf = memalign(CACHE_LINE_SIZE, 1024 * 16);
-	char key_buf_str[24];
-	if (!key_buf) {
-		usb_key_valid = FAILED;
-	}
-	snprintf(key_buf_str, 24, "%x", (uint32_t)key_buf);
-	tmp_argv[0] = read_argv[FROM_USB].cmd;
-	tmp_argv[1] = read_argv[FROM_USB].interface;
-	tmp_argv[2] = read_argv[FROM_USB].dev;
-	tmp_argv[3] = key_buf_str;
-	tmp_argv[4] = "usb_debug_key.der";
-	if (do_fat_fsload(0, 0, 5, tmp_argv)) {
-		pr_msg("unable to open %s\n from usb", tmp_argv[4]);
-		usb_key_valid = FAILED;
-	} else {
-		unsigned char *salted_challenge =
-			memalign(CACHE_LINE_SIZE, 512);
-		memset(salted_challenge, 0, 512);
-		strcpy((char *)salted_challenge,
-		       "salt to derived challenge into mips key challenge");
-		memcpy(&salted_challenge[128], sunxi_challenge,
-		       sunxi_challenge_len);
-		if (sunxi_verify_mips(salted_challenge,
-				      128 + sunxi_challenge_len, key_buf,
-				      1024 * 16)) {
-			pr_err("verify usb debug key failed\n");
-			usb_key_valid = FAILED;
-		} else {
-			usb_key_valid = PASS;
-		}
-	}
-	free(key_buf);
-	return;
 }
 
 static int try_fat_fload(struct read_param_t *read_argv,
@@ -216,30 +163,24 @@ static int try_fat_fload(struct read_param_t *read_argv,
 	int read_src = -1;
 
 	if (usb_debug_enabled) {
-		if (usb_key_valid == NOT_DONE)
-			verify_usb_key(read_argv);
-
-		if (usb_key_valid == PASS) {
-			tmp_argv[0] = read_argv[FROM_USB].cmd;
-			tmp_argv[1] = read_argv[FROM_USB].interface;
-			tmp_argv[2] = read_argv[FROM_USB].dev;
-			if (!cert_addr) {
-				tmp_argv[3] = mips_data_info->str_addr;
-				tmp_argv[4] = mips_data_info->file_name;
-				file_len    = &mips_data_info->file_len;
-			} else {
-				tmp_argv[3] = cert_addr;
-				tmp_argv[4] = mips_data_info->cert_name;
-				file_len    = &mips_data_info->cert_len;
-			}
-			tmp_argv[5] = NULL;
-			if (do_fat_fsload(0, 0, 5, tmp_argv)) {
-				pr_msg("unable to open %s\n from usb",
-				       tmp_argv[4]);
-			} else {
-				read_src = FROM_USB;
-				goto read_done;
-			}
+		tmp_argv[0] = read_argv[FROM_USB].cmd;
+		tmp_argv[1] = read_argv[FROM_USB].interface;
+		tmp_argv[2] = read_argv[FROM_USB].dev;
+		if (!cert_addr) {
+			tmp_argv[3] = mips_data_info->str_addr;
+			tmp_argv[4] = mips_data_info->file_name;
+			file_len    = &mips_data_info->file_len;
+		} else {
+			tmp_argv[3] = cert_addr;
+			tmp_argv[4] = mips_data_info->cert_name;
+			file_len    = &mips_data_info->cert_len;
+		}
+		tmp_argv[5] = NULL;
+		if (do_fat_fsload(0, 0, 5, tmp_argv)) {
+			pr_msg("unable to open %s\n from usb", tmp_argv[4]);
+		} else {
+			read_src = FROM_USB;
+			goto read_done;
 		}
 	}
 
@@ -377,28 +318,6 @@ err:
 	return ret;
 }
 
-__maybe_unused static void release_mips(uint32_t img_addr)
-{
-#define MIPS_CFG_BASE 0x3061000
-	/* set mips clock to 400M*/
-	uint32_t src_clk = clock_get_pll6() * 2;
-	uint32_t div	 = src_clk / 400;
-	uint32_t reg	 = readl(SUNXI_CCM_BASE + 0x600);
-	reg &= ~(0x7);
-	reg |= div - 1;
-	writel(reg, SUNXI_CCM_BASE + 0x600);
-
-	/*enable mips clock, but dont release mips, set mips table addr first*/
-	reg |= 1 << 31;
-	writel(reg, SUNXI_CCM_BASE + 0x600);
-	writel(0x00030001, SUNXI_CCM_BASE + 0x60C);
-	udelay(100); /*wait module ready for configuration*/
-	writel(img_addr, MIPS_CFG_BASE + 0x30);
-
-	/*mips table addr set up done, now release mips*/
-	writel(0x00070001, SUNXI_CCM_BASE + 0x60C);
-}
-
 int do_boot_mips(cmd_tbl_t *cmdtp, int flag, int argc, char *const argv[])
 {
 	uint32_t img_addr;
@@ -432,14 +351,7 @@ int do_boot_mips(cmd_tbl_t *cmdtp, int flag, int argc, char *const argv[])
 				pr_err("no info for mips memory\n");
 				ret = -1;
 			} else {
-#if 0 //do not release mips for now
-				if (sunxi_get_secureboard()) {
-					smc_tee_setup_mips(img_addr,
-							   mips_only_size);
-				} else {
-					release_mips(img_addr);
-				}
-#endif
+				smc_tee_setup_mips(img_addr, mips_only_size);
 				ret = fdt_add_mem_rsv(working_fdt, img_addr,
 						      mips_only_size +
 							      shm_size);

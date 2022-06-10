@@ -123,12 +123,8 @@ int disable_interrupts (void)
 
 void bad_mode (void)
 {
-#if 1
-	asm volatile("b .");
-#else
 	panic ("Resetting CPU ...\n");
 	reset_cpu (0);
-#endif
 }
 
 static void show_efi_loaded_images(struct pt_regs *regs)

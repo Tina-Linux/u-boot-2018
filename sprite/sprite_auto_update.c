@@ -35,7 +35,7 @@ DECLARE_GLOBAL_DATA_PTR;
 #define SCRIPT_FILE_COMMENT '#' // symbol for comment
 #define SCRIPT_FILE_END '%' // symbol for file end
 #define MAX_LINE_SIZE 8000
-#define MAX_FILE_SIZE (0x800000)
+#define MAX_FILE_SIZE (0x1000000)
 #define IS_COMMENT(x) (SCRIPT_FILE_COMMENT == (x))
 #define IS_FILE_END(x) (SCRIPT_FILE_END == (x))
 #define IS_LINE_END(x) ('\r' == (x) || '\n' == (x))
@@ -44,7 +44,7 @@ DECLARE_GLOBAL_DATA_PTR;
 #if defined(CONFIG_SUNXI_SPINOR)
 #define AU_ONCE_DATA_DEAL (2 * 1024 * 1024)
 #else
-#define AU_ONCE_DATA_DEAL (3 * 1024 * 1024)
+#define AU_ONCE_DATA_DEAL (16 * 1024 * 1024)
 #endif
 #define AU_ONCE_SECTOR_DEAL (AU_ONCE_DATA_DEAL / 512)
 #define IMG_NAME "update/FIRMWARE.bin"

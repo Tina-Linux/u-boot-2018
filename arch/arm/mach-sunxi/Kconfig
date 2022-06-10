@@ -177,12 +177,6 @@ config MACH_SUN8IW7
 	select SUNXI_VERSION1
 	select SUNXI_SECURE
 
-config MACH_SUN8IW11
-
-	bool "sun8i(Allwinner sun8iw11)"
-	select CPU_V7
-	select SUNXI_VERSION1
-
 config MACH_SUN8IW15
 	bool "sun8i(Allwinner sun8iw15)"
 	select CPU_V7
@@ -321,7 +315,6 @@ config SYS_CONFIG_NAME
 	default "sun8iw18p1" if MACH_SUN8IW18
 	default "sun8iw19p1" if MACH_SUN8IW19
 	default "sun8iw7p1" if MACH_SUN8IW7
-	default "sun8iw11p1" if MACH_SUN8IW11
 	default "sun8iw20p1" if MACH_SUN8IW20
 	default "sun8iw21p1" if MACH_SUN8IW21
 
