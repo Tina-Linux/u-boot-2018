@@ -273,8 +273,11 @@ static bool aw_host_nfc_wait_rb_ready(struct aw_nand_chip *chip, struct aw_nand_
 	do {
 		val = readl(host->nfc_reg.sta);
 		if (chip->selected_chip.chip_no != -1) {
-			ret = ((val & NFC_RB_STATE(chip->selected_chip.ceinfo[chip_no].relate_rb_no))
-					&& (val & NFC_RB_B2R));
+#ifndef DBG_NFC
+			ret = (val & NFC_RB_STATE(chip->selected_chip.ceinfo[chip_no].relate_rb_no));
+#else
+			ret = ((val & NFC_RB_STATE(chip->selected_chip.ceinfo[chip_no].relate_rb_no)) && (val & NFC_RB_B2R));
+#endif
 			if (ret) {
 				break;
 			}
@@ -298,14 +301,16 @@ static bool aw_host_nfc_rb_ready(struct aw_nand_chip *chip, struct aw_nand_host 
 
 	val = readl(host->nfc_reg.sta);
 	if (chip->selected_chip.chip_no != -1) {
-		ret = ((val & NFC_RB_STATE(chip->selected_chip.ceinfo[chip_no].relate_rb_no))
-				&& (val & NFC_RB_B2R));
+#ifndef DBG_NFC
+		ret = (val & NFC_RB_STATE(chip->selected_chip.ceinfo[chip_no].relate_rb_no));
+#else
+		ret = ((val & NFC_RB_STATE(chip->selected_chip.ceinfo[chip_no].relate_rb_no)) && (val & NFC_RB_B2R));
+#endif
 	}
 	AWRAWNAND_TRACE_NFC("Exit %s %s status[%p:%x]\n", __func__, ret ? "ready" : "busy",
 			host->nfc_reg.sta, readl(host->nfc_reg.sta));
 	return ret ? true : false;
 }
-
 
 static int aw_host_wait_dma_ready_flag_timeout(struct aw_nand_host *host, uint32_t timeout_ms)
 {

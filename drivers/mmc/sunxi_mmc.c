@@ -45,6 +45,19 @@ static u8 ext_sdly_spd_freq[MAX_SPD_MD_NUM*MAX_CLK_FREQ_NUM];
 static u8 ext_odly_spd_freq_sdc0[MAX_SPD_MD_NUM*MAX_CLK_FREQ_NUM];
 static u8 ext_sdly_spd_freq_sdc0[MAX_SPD_MD_NUM*MAX_CLK_FREQ_NUM];
 
+void dumphex32(char *name, char *base, int len)
+{
+	__u32 i;
+
+	printf("dump %s registers:", name);
+	for (i = 0; i < len; i += 4) {
+		if (!(i & 0xf))
+			printf("\n0x%p : ", base + i);
+		printf("0x%08x ", readl((ulong)base + i));
+	}
+	printf("\n");
+}
+
 void mmc_dump_errinfo(struct sunxi_mmc_priv *smc_priv, struct mmc_cmd *cmd)
 {
 	MMCMSG(smc_priv->mmc, "smc %d err, cmd %d, %s%s%s%s%s%s%s%s%s%s%s\n",
@@ -61,19 +74,6 @@ void mmc_dump_errinfo(struct sunxi_mmc_priv *smc_priv, struct mmc_cmd *cmd)
 		smc_priv->raw_int_bak & SDXC_EndBitErr   ? " EBE"    : "",
 		smc_priv->raw_int_bak == 0 ? " STO"    : ""
 		);
-}
-
-void dumphex32(char *name, char *base, int len)
-{
-	__u32 i;
-
-	printf("dump %s registers:", name);
-	for (i = 0; i < len; i += 4) {
-		if (!(i & 0xf))
-			printf("\n0x%p : ", base + i);
-		printf("0x%08x ", readl((ulong)base + i));
-	}
-	printf("\n");
 }
 
 static int sunxi_mmc_getcd_gpio(int sdc_no)
@@ -407,12 +407,6 @@ static int mmc_trans_data_by_dma(struct sunxi_mmc_priv *priv, struct mmc *mmc, s
 			pdes[des_idx].data_buf1_sz = SDXC_DES_BUFFER_MAX_LEN;
 		else
 			pdes[des_idx].data_buf1_sz = remain;
-		/* AW1823 AW1851 AW1855 ... support 4G ddr
-		 * AW1823 sdc0/sdc1 version: 0x40200
-		 * AW1823 sdc2 version: 0x40502
-		 * AW1851 AW1855.. version: 0x50300
-		 * AW1750 sdc0:version:0x40104
-		 * */
 		if (priv->version == 0x40200 || priv->version == 0x40502 || priv->version >= 0x50300 || priv->version == 0x40104)
 			pdes[des_idx].buf_addr_ptr1 = ((ulong)buff + i * SDXC_DES_BUFFER_MAX_LEN)
 							>> 2;
@@ -427,12 +421,6 @@ static int mmc_trans_data_by_dma(struct sunxi_mmc_priv *priv, struct mmc *mmc, s
 			pdes[des_idx].end_of_ring = 1;
 			pdes[des_idx].buf_addr_ptr2 = 0;
 		} else {
-			/* AW1823 AW1851 AW1855 ... support 4G ddr
-			 * AW1823 sdc0/sdc1 version: 0x40200
-			 * AW1823 sdc2 version: 0x40502
-			 * AW1851 AW1855.. version: 0x50300
-			 * AW1750 sdc0:version:0x40104
-			 * */
 			if (priv->version == 0x40200 || priv->version == 0x40502 || priv->version >= 0x50300 || priv->version == 0x40104)
 				pdes[des_idx].buf_addr_ptr2 = ((ulong)&pdes[des_idx + 1]) >> 2;
 			else
@@ -475,12 +463,7 @@ static int mmc_trans_data_by_dma(struct sunxi_mmc_priv *priv, struct mmc *mmc, s
 	else
 		rval |= (1 << 1);
 	writel(rval, &priv->reg->idie);
-	/* AW1823 AW1851 AW1855 ... support 4G ddr
-	 * AW1823 sdc0/sdc1 version: 0x40200
-	 * AW1823 sdc2 version: 0x40502
-	 * AW1851 AW1855.. version: 0x50300
-	 * AW1750 sdc0:version:0x40104
-	 * */
+
 	if (priv->version == 0x40200 || priv->version == 0x40502 || priv->version >= 0x50300 || priv->version == 0x40104)
 		writel(((unsigned long)pdes) >> 2, &priv->reg->dlba);
 	else
@@ -531,11 +514,9 @@ static void sunxi_mmc_set_rdtmout_reg(struct sunxi_mmc_priv *priv, struct mmc *m
 	}
 
 	rval = readl(&priv->reg->gctrl);
-	if (rdto_clk > 0xffffff) {
+	/*ddr50 mode don't use 256x timeout unit*/
+	if (rdto_clk > 0xffffff && mmc->speed_mode != HSDDR52_DDR50) {
 		rdto_clk = (rdto_clk + 255)/256;
-		/*for ddr mode, 256x must use even*/
-		if (mmc->speed_mode == HSDDR52_DDR50 && (rdto_clk % 2))
-			rdto_clk += 1;
 		rval |= (0x1 << 11);
 	} else {
 		rdto_clk = 0xffffff;
@@ -1429,7 +1410,8 @@ struct mmc *sunxi_mmc_init(int sdc_no)
 	&& !defined(CONFIG_MACH_SUN50IW10) && !defined(CONFIG_MACH_SUN8IW15)\
 	&& !defined(CONFIG_MACH_SUN50IW11) && !defined(CONFIG_MACH_SUN50IW12)\
 	&& !defined(CONFIG_MACH_SUN20IW1) && !defined(CONFIG_MACH_SUN8IW20)\
-	&& !defined(CONFIG_MACH_SUN8IW21) && !defined(CONFIG_MACH_SUN50IW5)
+	&& !defined(CONFIG_MACH_SUN8IW21) && !defined(CONFIG_MACH_SUN50IW5)\
+	&& !defined(CONFIG_MACH_SUN55IW3)
 	setbits_le32(&ccm->ahb_gate0, 1 << AHB_GATE_OFFSET_MMC(sdc_no));
 
 #ifdef CONFIG_SUNXI_GEN_SUN6I

@@ -8,7 +8,6 @@
 
 /* #define FPGA_PLATFORM */
 
-#define CONFIG_SUNXI_GPIO_V2
 
 #ifdef CONFIG_SUNXI_UBIFS
 #define CONFIG_AW_MTD_SPINAND 1

@@ -6,7 +6,7 @@
 #include <linux/kernel.h>
 #include <linux/printk.h>
 #include "controller/ndfc_base.h"
-#include "rawnand.h"
+#include <sunxi_nand.h>
 
 #define DBG
 #ifdef DBG

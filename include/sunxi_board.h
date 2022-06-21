@@ -35,6 +35,7 @@ extern int sunxi_fastboot_status_read(void);
 extern void sunxi_board_close_source(void);
 extern int sunxi_board_restart(int next_mode);
 extern int sunxi_board_shutdown(void);
+extern int sunxi_platform_power_off(void);
 extern int sunxi_board_prepare_kernel(void);
 extern int sunxi_board_run_fel(void);
 extern int sunxi_board_run_fel_eraly(void);
@@ -163,6 +164,7 @@ extern u32 get_pmu_byte_from_boot0(void);
 extern int sunxi_get_active_boot0_id(void);
 
 extern int mmc_request_update_boot0(int dev_num);
+extern int mmc_read_info(int dev_num, void *buffer, u32 buffer_size, void *priv_info);
 extern int mmc_write_info(int dev_num, void *buffer, u32 buffer_size);
 
 extern int get_debugmode_flag(void);
@@ -251,6 +253,10 @@ extern int sunxi_arisc_probe(void);
 
 #ifdef CONFIG_XTENSA_DSP
 int sunxi_dsp_init(u32 img_addr, u32 run_ddr, u32 dsp_id);
+#endif
+
+#ifdef CONFIG_RISCV_E907
+int sunxi_riscv_init(u32 img_addr, u32 run_ddr, u32 riscv_id);
 #endif
 
 #ifdef CONFIG_SUNXI_USB_DETECT

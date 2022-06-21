@@ -107,3 +107,15 @@ U_BOOT_CMD(reboot_script, 6, 1, do_reboot_script, "reboot_script sub-system",
 		"reboot_script efex [cnt]\n"
 		"reboot_script reset [cnt]\n");
 #endif
+
+int rtc_set_dcxo_off(void)
+{
+	__attribute__((unused)) u32 reg_val;
+#ifdef CONFIG_MACH_SUN50IW10
+	/* set wifi off */
+	reg_val = readl(RTC_XO_CTRL_REG);
+	reg_val |= (1 << 31);
+	writel(reg_val, RTC_XO_CTRL_REG);
+#endif
+	return 0;
+}

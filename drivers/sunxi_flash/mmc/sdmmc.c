@@ -79,6 +79,7 @@ static int sunxi_flash_mmc_write(unsigned int start_block, unsigned int nblock,
 	    nblock, buffer);
 }
 
+int card_verify_boot0(uint start_block, uint length);
 static int sunxi_flash_mmc_download_spl(unsigned char *buf, int len,
 					unsigned int ext)
 {
@@ -99,16 +100,20 @@ static int sunxi_flash_mmc_download_spl(unsigned char *buf, int len,
 						     write_offset[i], len / 512,
 						     buf)) {
 			pr_force("%s: write %s failed\n", __func__,
-			       write_offset[i] == SUNXI_MMC_BOOT0_START_ADDRS ?
-				       "main spl" :
-				       "back spl");
+				 write_offset[i] ==
+						 SUNXI_MMC_BOOT0_START_ADDRS ?
+					 "main spl" :
+					 "back spl");
 			fail_count++;
-			continue;
 		} else {
 			pr_force("%s: write %s done\n", __func__,
-			       write_offset[i] == SUNXI_MMC_BOOT0_START_ADDRS ?
-				       "main spl" :
-				       "back spl");
+				 write_offset[i] ==
+						 SUNXI_MMC_BOOT0_START_ADDRS ?
+					 "main spl" :
+					 "back spl");
+		}
+		if (card_verify_boot0(write_offset[i], len) < 0) {
+			return -1;
 		}
 	}
 	if (fail_count == 2) {

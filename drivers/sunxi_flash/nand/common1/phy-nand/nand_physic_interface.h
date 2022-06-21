@@ -4,7 +4,8 @@
 #define __NAND_PHYSIC_INTERFACE_H__
 
 #include "../aw_nand_type.h"
-#include "nand-partition/phy.h"
+//#include "nand-partition/phy.h"
+#include <sunxi_nand_partitions.h>
 extern __u32 storage_type;
 
 extern struct _nand_info aw_nand_info;

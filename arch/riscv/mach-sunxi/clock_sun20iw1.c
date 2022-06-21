@@ -87,8 +87,7 @@ uint clock_get_pll6(void)
 	factor_p0 = ((reg_val >> 16) & 0x7) + 1;
 	factor_n = ((reg_val >> 8) & 0xff) + 1;
 	factor_m = ((reg_val >> 1) & 0x01) + 1;
-	pll6 = (24 * factor_n /factor_m/factor_p0)>>1;
-
+	pll6 = (24 * factor_n / factor_m / factor_p0) >> 1;
 
 	return pll6;
 }
@@ -117,12 +116,11 @@ uint clock_get_corepll(void)
 		reg_val  = readl(&ccm->pll1_cfg);
 		factor_n = ((reg_val >> 8) & 0xff) + 1;
 
-		clock = 24*factor_n;
+		clock = 24 * factor_n;
 		break;
 	default:
 		return 0;
 	}
-
 	return clock;
 }
 
@@ -155,7 +153,7 @@ uint clock_get_ahb(void)
 	reg_val = readl(&ccm->psi_ahb1_ahb2_cfg);
 	src = (reg_val >> 24) & 0x3;
 	factor_m  = ((reg_val >> 0) & 0x03) + 1;
-	factor_n  = 1<< ((reg_val >> 8) & 0x03);
+	factor_n  = (1 << ((reg_val >> 8) & 0x03));
 
 	switch (src) {
 	case 0://OSC24M
@@ -189,9 +187,9 @@ uint clock_get_apb1(void)
 	int clock = 0, factor_m = 0, factor_n = 0;
 
 	reg_val = readl(&ccm->apb1_cfg);
-	factor_m  = ((reg_val >> 0) & 0x03) + 1;
-	factor_n  = 1<<((reg_val >> 8) & 0x03);
-	src = (reg_val >> 24)&0x3;
+	factor_m  = ((reg_val >> 0) & 0x1f) + 1;
+	factor_n  = (1 << ((reg_val >> 8) & 0x03));
+	src = (reg_val >> 24) & 0x3;
 
 	switch (src) {
 	case 0://OSC24M
@@ -224,9 +222,9 @@ uint clock_get_apb2(void)
 	int src = 0, src_clock = 0;
 
 	reg_val = readl(&ccm->apb2_cfg);
-	src = (reg_val >> 24)&0x3;
-	factor_m  = ((reg_val >> 0) & 0x03) + 1;
-	factor_n  = ((reg_val >> 8) & 0x03) + 1;
+	src = (reg_val >> 24) & 0x3;
+	factor_m  = ((reg_val >> 0) & 0x1f) + 1;
+	factor_n  = (1 << ((reg_val >> 8) & 0x03));
 
 	switch (src) {
 	case 0://OSC24M
@@ -257,12 +255,11 @@ uint clock_get_mbus(void)
 	unsigned int clock;
 
 	clock = clock_get_pll_ddr();
-	clock = clock/4;
+	clock = clock / 4;
 
 	return clock;
 }
 
-#if 0
 static int clk_get_pll_para(struct core_pll_freq_tbl *factor, int pll_clk)
 {
 	int index;
@@ -280,8 +277,6 @@ int clock_set_corepll(int frequency)
 	unsigned int reg_val = 0;
 	struct sunxi_ccm_reg *const ccm =
 		(struct sunxi_ccm_reg *)SUNXI_CCM_BASE;
-	struct sunxi_prcm_reg *const prcm =
-		(struct sunxi_prcm_reg *)SUNXI_PRCM_BASE;
 	struct core_pll_freq_tbl  pll_factor;
 
 	if (frequency == clock_get_corepll())
@@ -291,49 +286,59 @@ int clock_set_corepll(int frequency)
 
 
 	/* switch to 24M*/
-	reg_val = readl(&ccm->cpu_axi_cfg);
+	reg_val   = readl(&ccm->riscv_clk_reg);
 	reg_val &= ~(0x07 << 24);
-	writel(reg_val, &ccm->cpu_axi_cfg);
+	writel(reg_val, &ccm->riscv_clk_reg);
 	__udelay(20);
 
+	/*pll disable*/
+	reg_val = readl(&ccm->pll1_cfg);
+	reg_val &= ~(0x01 << 31);
+	writel(reg_val, &ccm->pll1_cfg);
+
 	/*pll output disable*/
-	reg_val = readl(&prcm->pll1_cfg);
+	reg_val = readl(&ccm->pll1_cfg);
 	reg_val &= ~(0x01 << 27);
-	writel(reg_val, &prcm->pll1_cfg);
+	writel(reg_val, &ccm->pll1_cfg);
 
 	/*get config para form freq table*/
 	clk_get_pll_para(&pll_factor, frequency);
 
-	reg_val = readl(&prcm->pll1_cfg);
+	reg_val = readl(&ccm->pll1_cfg);
 	reg_val &= ~((0xff << 8)  | (0x03 << 0));
-	reg_val |=  ((pll_factor.FactorN << 8) | (pll_factor.FactorM << 0));
-	writel(reg_val, &prcm->pll1_cfg);
+	reg_val |= (pll_factor.FactorN << 8) | (pll_factor.FactorM << 0) ;
+	writel(reg_val, &ccm->pll1_cfg);
 	__udelay(20);
 
 	/*enable lock*/
-	reg_val = readl(&prcm->pll1_cfg);
+	reg_val = readl(&ccm->pll1_cfg);
 	reg_val |=  (0x1 << 29);
-	writel(reg_val, &prcm->pll1_cfg);
+	writel(reg_val, &ccm->pll1_cfg);
+
+	/*enable pll*/
+	reg_val = readl(&ccm->pll1_cfg);
+	reg_val |=	(0x1 << 31);
+	writel(reg_val, &ccm->pll1_cfg);
 #ifndef FPGA_PLATFORM
 	do {
-		reg_val = readl(&prcm->pll1_cfg);
+		reg_val = readl(&ccm->pll1_cfg);
 	} while (!(reg_val & (0x1 << 28)));
 #endif
 
 	/*enable pll output*/
-	reg_val = readl(&prcm->pll1_cfg);
+	reg_val = readl(&ccm->pll1_cfg);
 	reg_val |=  (0x1 << 27);
-	writel(reg_val, &prcm->pll1_cfg);
+	writel(reg_val, &ccm->pll1_cfg);
+	__udelay(20);
 
 	/* switch clk src to COREPLL*/
-	reg_val = readl(&ccm->cpu_axi_cfg);
+	reg_val = readl(&ccm->riscv_clk_reg);
 	reg_val &= ~(0x07 << 24);
-	reg_val |=  (0x03 << 24);
-	writel(reg_val, &ccm->cpu_axi_cfg);
+	reg_val |=  (0x05 << 24);
+	writel(reg_val, &ccm->riscv_clk_reg);
 
 	return  0;
 }
-#endif
 
 int usb_open_clock(void)
 {

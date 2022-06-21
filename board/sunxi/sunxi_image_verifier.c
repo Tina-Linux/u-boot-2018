@@ -16,8 +16,9 @@
 #include <smc.h>
 #include <private_uboot.h>
 #include <sunxi_verify_boot_info.h>
-#ifdef CONFIG_SUNXI_IMAGE_HEADER
+#include <sys_partition.h>
 #include <asm/arch/efuse.h>
+#ifdef CONFIG_SUNXI_IMAGE_HEADER
 #include <sunxi_image_header.h>
 #endif
 #ifdef CONFIG_CRYPTO
@@ -359,6 +360,48 @@ int sunxi_verify_get_rotpk_hash(void *hash_buf)
 	return 0;
 }
 
+int sunxi_verify_toc1_root_cert(void *buf)
+{
+	sbrom_toc1_head_info_t *toc1_head;
+	struct sbrom_toc1_item_info *toc1_item;
+	sunxi_certif_info_t root_certif;
+	int ret;
+	u8 *cert;
+	uint8_t key_hash[32];
+
+	toc1_head = (struct sbrom_toc1_head_info *)(buf);
+	if (toc1_head->magic != TOC_MAIN_INFO_MAGIC) {
+		pr_err("toc1 magic is error\n");
+		return -1;
+	}
+
+	toc1_item = (struct sbrom_toc1_item_info *)
+				(buf + sizeof(struct sbrom_toc1_head_info));
+
+	/*Parse root certificate*/
+	cert = (u8 *)(buf + toc1_item->data_offset);
+	ret = sunxi_certif_verify_itself(&root_certif, cert, toc1_item->data_len);
+	if (ret < 0) {
+		pr_err("verify root cert error\n");
+		return -2;
+	}
+
+	sunxi_ss_open();
+	memset(key_hash, 0x0, sizeof(key_hash));
+	ret = sunxi_certif_pubkey_check(&root_certif.pubkey, key_hash);
+	if (ret < 0) {
+		pr_err("fail to cal pubkey hash\n");
+		return -3;
+	}
+
+	ret = sunxi_efuse_verify_rotpk(key_hash);
+	if (ret < 0) {
+		pr_err("verify rotpk error\n");
+		return -3;
+	}
+	return 0;
+}
+
 #ifdef CONFIG_SUNXI_ANTI_BRUSH
 int sunxi_verify_rotpk_hash(void *input_hash_buf, int len)
 {
@@ -474,7 +517,6 @@ static int cal_partioin_len(disk_partition_t *info)
 int sunxi_verify_partion(struct sunxi_image_verify_pattern_st *pattern,
 			const char *part_name, const char *cert_name, int full)
 {
-	struct blk_desc *desc;
 	int ret = 0;
 	disk_partition_t info = { 0 };
 	int i;
@@ -485,12 +527,11 @@ int sunxi_verify_partion(struct sunxi_image_verify_pattern_st *pattern,
 	uint64_t part_len;
 	uint32_t whole_sample_len;
 
-	desc = blk_get_devnum_by_typename("sunxi_flash", 0);
-	if (desc == NULL)
+	if (sunxi_partition_get_info(part_name, &info)) {
+		printf("get part: %s info failed\n", part_name);
 		return -ENODEV;
+	}
 
-	if (sunxi_flash_try_partition(desc, part_name, &info) < 0)
-		return -ENODEV;
 	part_len = cal_partioin_len(&info);
 
 	if (full == 1) {
@@ -734,6 +775,8 @@ int sunxi_verify_dsp(ulong img_addr, u32 image_len, u32 dsp_id)
 			if (sunxi_image_verify(img_addr, cert_name) != 0) {
 				pr_error("dsp %s verify failed\n", cert_name);
 				return -1;
+			} else {
+				printf("dsp %d verify success!\n", dsp_id);
 			}
 		} else {
 			pr_error("not find sunxi_image_header\n");
@@ -747,6 +790,48 @@ int sunxi_verify_dsp(ulong img_addr, u32 image_len, u32 dsp_id)
 		ret = sunxi_verify_signature((void *)img_addr, image_len, cert_name);
 		if (ret < 0) {
 			pr_error("dsp: sunxi_verify_signature fail: %d\n", ret);
+			return -2;
+		}
+#endif
+	}
+
+	return 0;
+}
+#endif
+
+#ifdef CONFIG_SUNXI_VERIFY_RISCV
+int sunxi_verify_riscv(ulong img_addr, u32 image_len, u32 riscv_id)
+{
+	int ret = 0;
+	char *cert_name = NULL;
+
+	if (gd->securemode) {
+		if (riscv_id == 0) {
+			cert_name = env_get("riscv0_partition");
+			pr_msg("cert_name = %s\n", cert_name);
+		}
+#ifdef CONFIG_SUNXI_IMAGE_HEADER
+		ret = sunxi_image_header_check((sunxi_image_header_t *)img_addr);
+		if (ret == 0) {
+			pr_error("find sunxi_image_header\n");
+			if (sunxi_image_verify(img_addr, cert_name) != 0) {
+				pr_error("riscv %s verify failed\n", cert_name);
+				return -1;
+			} else {
+				printf("riscv %d verify success!\n", riscv_id);
+			}
+		} else {
+			pr_error("not find sunxi_image_header\n");
+			return -2;
+		}
+#else
+		if (!image_len) {
+			pr_error("riscv len is zero\n");
+			return -1;
+		}
+		ret = sunxi_verify_signature((void *)img_addr, image_len, cert_name);
+		if (ret < 0) {
+			pr_error("riscv: sunxi_verify_signature fail: %d\n", ret);
 			return -2;
 		}
 #endif
@@ -841,7 +926,11 @@ int sunxi_image_verify(ulong os_load_addr, const char *cert_name)
 	uint8_t sign_of_hash[32] = {0};
 
 	sunxi_image_header_t *ih = (sunxi_image_header_t *)src;
-	sunxi_tlv_header_t *tlv = (sunxi_tlv_header_t *)(src + ih->ih_hsize + ih->ih_psize);
+	sunxi_tlv_header_t tlv_tmp = {0};
+	sunxi_tlv_header_t *tlv = &tlv_tmp; //(sunxi_tlv_header_t *)(src + ih->ih_hsize + ih->ih_psize);
+
+
+	memcpy(tlv, src + ih->ih_hsize + ih->ih_psize, sizeof(sunxi_tlv_header_t));
 
 	ret = sunxi_tlv_header_check(tlv);
 	if (ret) {

@@ -8,8 +8,8 @@
 
 #ifndef __RAWNAND_CHIP_H__
 #define __RAWNAND_CHIP_H__
-
-#include "rawnand.h"
+#include <sunxi_nand.h>
+//#include "rawnand.h"
 #include "controller/ndfc_base.h"
 
 extern struct _nand_storage_info *g_nsi;

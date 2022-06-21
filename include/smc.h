@@ -27,6 +27,7 @@ int arm_svc_arisc_startup(ulong cfg_base);
 int arm_svc_arisc_wait_ready(void);
 int arm_svc_arisc_fake_poweroff(void);
 int arm_svc_fake_poweroff(ulong dtb_base);
+int arm_svc_poweroff(void);
 u32 arm_svc_arisc_read_pmu(ulong addr);
 int arm_svc_arisc_write_pmu(ulong addr,u32 value);
 

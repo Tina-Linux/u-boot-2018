@@ -18,6 +18,8 @@
 #include "ce_1.0.h"
 #elif defined(CONFIG_SUNXI_CE_21)
 #include "ce_2.1.h"
+#elif defined(CONFIG_SUNXI_CE_23)
+#include "ce_2.3.h"
 #else
 #error "Unsupported plat"
 #endif
@@ -34,5 +36,31 @@ s32 sunxi_rsa_calc(u8 *n_addr,   u32 n_len,
 				   u8 *dst_addr, u32 dst_len,
 				   u8 *src_addr, u32 src_len);
 #endif
+
+#define SM2_SIZE_BYTE	(256)
+struct sunxi_sm2_ctx_t {
+	u32 mode;
+	u32 sm2_size;
+	u32 k_len;
+	u8 *k;
+	u8 *n;
+	u8 *p;
+	u8 *a;
+	u8 *b;
+	u8 *gx;
+	u8 *gy;
+	u8 *px;
+	u8 *py;
+	u8 *d;
+	u8 *r;
+	u8 *s;
+	u8 *m;
+	u32 m_len;
+	u8 *cx;
+	u8 *cy;
+	u8 *kx;
+	u8 *ky;
+	u8 *out;
+};
 
 #endif /* _SUNXI_CE_H */

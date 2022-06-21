@@ -79,6 +79,15 @@ int bmu_axp2202_set_power_off(void)
 	return 0;
 }
 
+int bmu_axp2202_reset_capacity(void)
+{
+	if (pmic_bus_write(AXP2202_RUNTIME_ADDR, AXP2202_GAUGE_CONFIG, 0x00))
+		return -1;
+
+	return 1;
+}
+
+
 /*
 	boot_source	0x20		help			return
 
@@ -280,6 +289,44 @@ unsigned char bmu_axp2202_set_reg_value(unsigned char reg_addr, unsigned char re
 	return reg;
 }
 
+int bmu_axp2202_set_ntc_onff(int onoff)
+{
+	unsigned char reg_value;
+	if (!onoff) {
+		if (pmic_bus_read(AXP2202_RUNTIME_ADDR, AXP2202_TS_CFG, &reg_value))
+			return -1;
+
+		reg_value &= ~(1 << 1);
+		if (pmic_bus_write(AXP2202_RUNTIME_ADDR, AXP2202_TS_CFG, reg_value))
+			return -1;
+
+		if (pmic_bus_read(AXP2202_RUNTIME_ADDR, AXP2202_ADC_CH_EN0, &reg_value))
+			return -1;
+
+		reg_value |= (1 << 4);
+		reg_value &= ~(3 << 2);
+		if (pmic_bus_write(AXP2202_RUNTIME_ADDR, AXP2202_ADC_CH_EN0, reg_value))
+			return -1;
+	} else {
+		if (pmic_bus_read(AXP2202_RUNTIME_ADDR, AXP2202_TS_CFG, &reg_value))
+			return -1;
+
+		reg_value |= (1 << 1);
+		if (pmic_bus_write(AXP2202_RUNTIME_ADDR, AXP2202_TS_CFG, reg_value))
+			return -1;
+
+		if (pmic_bus_read(AXP2202_RUNTIME_ADDR, AXP2202_ADC_CH_EN0, &reg_value))
+			return -1;
+
+		reg_value &= ~(1 << 4);
+		reg_value |= (3 << 2);
+		if (pmic_bus_write(AXP2202_RUNTIME_ADDR, AXP2202_ADC_CH_EN0, reg_value))
+			return -1;
+
+	}
+
+	return 0;
+}
 
 U_BOOT_AXP_BMU_INIT(bmu_axp2202) = {
 	.bmu_name		  = "bmu_axp2202",
@@ -296,4 +343,6 @@ U_BOOT_AXP_BMU_INIT(bmu_axp2202) = {
 	.set_charge_current_limit = bmu_axp2202_set_charge_current_limit,
 	.get_reg_value	   = bmu_axp2202_get_reg_value,
 	.set_reg_value	   = bmu_axp2202_set_reg_value,
+	.reset_capacity    = bmu_axp2202_reset_capacity,
+	.set_ntc_onoff     = bmu_axp2202_set_ntc_onff,
 };

@@ -691,6 +691,17 @@ void nand_parts3_to_parts2(struct nand_partitions *parts3, PARTITION_MBR *parts2
 {
 	int p = 0;
 
+	if (parts3->nc > MAX_PART_COUNT_PER_FTL) {
+		parts2_mbr->PartCount = 1;
+		parts2_parts->data[0].size = new_parts_size;
+		parts2_parts->data[0].cross_talk = parts3->cross_talk;
+		parts2_parts->data[0].attribute = parts3->attribute;
+		parts2_parts->data[0].start = parts3->start;
+		parts2_parts->data[0].end = parts3->end;
+
+		parts2_parts->data[0].nand_disk[p].size = parts2_parts->data[0].size;
+		return;
+	}
 	/*build 2.0 mbr*/
 	parts2_mbr->PartCount = parts3->nc;
 	for (p = 0; p < parts3->nc; p++) {
@@ -886,9 +897,9 @@ int nand_build_phy_partitions(struct _nand_phy_partition **partition_head, int s
 	pr_debug("phy partition: attribute: %d\n", phy_partition->Attribute);
 	pr_debug("phy partition: crosstalk: %d\n", phy_partition->CrossTalk);
 	pr_debug("phy partition: free block: %d\n", phy_partition->FreeBlock);
-	pr_info("phy partition: start block: %d.%d\n", phy_partition->StartBlock.Chip_NO, phy_partition->StartBlock.Block_NO);
-	pr_info("phy partition: end block: %d.%d\n", phy_partition->EndBlock.Chip_NO, phy_partition->EndBlock.Block_NO);
-	pr_info("phy partition: total sectors: %u\n", phy_partition->TotalSectors);
+	pr_debug("phy partition: start block: %d.%d\n", phy_partition->StartBlock.Chip_NO, phy_partition->StartBlock.Block_NO);
+	pr_debug("phy partition: end block: %d.%d\n", phy_partition->EndBlock.Chip_NO, phy_partition->EndBlock.Block_NO);
+	pr_debug("phy partition: total sectors: %u\n", phy_partition->TotalSectors);
 
 	return 0;
 }

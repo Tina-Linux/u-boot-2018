@@ -182,10 +182,9 @@ struct sunxi_ccm_reg {
 	u8 reserved_0xa64[8];
 	u32 ahub_gate_reset;	/* 0xa6c Audio HUB gate/reset control */
 	u32 usb0_clk_cfg;	/* 0xa70 USB0(OTG) clock control */
-	u32 usb1_clk_cfg;	/* 0xa74 USB1(XHCI) clock control */
-	u8 reserved_0xa78[4];
-	u32 usb3_clk_cfg;	/* 0xa78 USB3 clock control */
-	u8 reserved_0xa80[12];
+	u8 reserved_0xa74[4];
+	u32 usb1_clk_cfg;	/* 0xa78 USB1 clock control */
+	u8 reserved_0xa7c[16];
 	u32 usb_gate_reset;	/* 0xa8c USB gate/reset control */
 	u8 reserved_0xa90[32];
 	u32 pcie_ref_clk_cfg;	/* 0xab0 PCIE REF clock control */
@@ -296,9 +295,17 @@ struct sunxi_ccm_reg {
 #define CCM_MMC_CTRL_M(x)		((x) - 1)
 #define CCM_MMC_CTRL_N(x)		((x) << 8)
 #define CCM_MMC_CTRL_OSCM24		(0x0 << 24)
+#define CCM_MMC_CTRL_ENABLE		(0x1 << 31)
+
+/* MMC2 clock bit field */
+#define CCM_MMC2_CTRL_PERI0_800M	(0x1 << 24)
+#define CCM_MMC2_CTRL_PERI1_800M	(0x2 << 24)
+#define CCM_MMC2_CTRL_PLL6X2		(0x3 << 24)
+#define CCM_MMC2_CTRL_PLL_PERIPH2X2	(0x4 << 24)
+/* MMC0 clock bit field */
 #define CCM_MMC_CTRL_PLL6X2		(0x1 << 24)
 #define CCM_MMC_CTRL_PLL_PERIPH2X2	(0x2 << 24)
-#define CCM_MMC_CTRL_ENABLE		(0x1 << 31)
+
 /* if doesn't have these delays */
 #define CCM_MMC_CTRL_OCLK_DLY(a)	((void) (a), 0)
 #define CCM_MMC_CTRL_SCLK_DLY(a)	((void) (a), 0)
@@ -332,4 +339,16 @@ struct sunxi_ccm_reg {
 #define CE_MBUS_GATING_MASK               (1)
 #define CE_MBUS_GATING_BIT		  (2)
 #define CE_MBUS_GATING			  (1)
+
+//usb
+#define USBEHCI0_RST_BIT 20
+#define USBEHCI0_GATIING_BIT 4
+#define USBPHY0_RST_BIT 30
+#define USBPHY0_SCLK_GATING_BIT 29
+
+#define USBEHCI1_RST_BIT 21
+#define USBEHCI1_GATIING_BIT 5
+#define USBPHY1_RST_BIT 30
+#define USBPHY1_SCLK_GATING_BIT 29
+
 #endif /* _SUNXI_CLOCK_SUN50IW12_H */

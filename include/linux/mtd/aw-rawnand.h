@@ -179,8 +179,8 @@
 /* 80h -- 11h ~ 81h -- 10h*/
 #define RAWNAND_JEDEC_MULTI_WRITE	BIT(14)
 
-/* Device needs 3rd row address cycle */
-#define RAWNAND_ROW_ADDR_3	BIT(16)
+/* Device needs 2rd row address cycle */
+#define RAWNAND_ROW_ADDR_2	BIT(16)
 
 /* Default Toggle DDR1.0 , SDR need to set*/
 #define RAWNAND_TOGGLE_DDR_TO_SDR	BIT(29)
@@ -190,6 +190,7 @@
 
 
 /* Macros to identify the above */
+#define RAWNAND_HAS_ONLY_TWO_DDR(chip) ((chip->options & RAWNAND_ROW_ADDR_2))
 #define RAWNAND_HAS_ITF_SDR(chip) ((chip->options & RAWNAND_ITF_SDR))
 #define RAWNAND_HAS_ITF_ONFI_DDR(chip) ((chip->options & RAWNAND_ITF_ONFI_DDR))
 #define RAWNAND_HAS_ITF_ONFI_DDR2(chip) ((chip->options & RAWNAND_ITF_ONFI_DDR2))
@@ -230,6 +231,11 @@
 #define RAWNAND_MFR_MXIC	0xc2
 #define RAWNAND_MFR_FORESEE	0xec
 #define RAWNAND_MFR_WINBOND	0xef
+#define RAWNAND_MFR_FIDELIX	0xad
+#define RAWNAND_MFR_UNILC	0xc8
+#define RAWNAND_MFR_JSC		0xad
+#define RAWNAND_MFR_DOSILICON	0xf8
+#define RAWNAND_MFR_FORESEE_1	0xcd
 
 /*
  * RAWNAND Flash Manufacture name
@@ -253,6 +259,10 @@
 #define TOSHIBA_NAME "toshiba"
 #define WINBOND_NAME "winbond"
 #define FORESEE_NAME "foresee"
+#define FIDELIX_NAME "fidelix"
+#define UNILC_NAME "unilc"
+#define JSC_NAME "jsc"
+#define DOSILICON_NAME "dosilicon"
 
 
 #define PE_CYCLES_1K	(1000)
@@ -307,13 +317,17 @@
 #define MAX_CHIPS (4U)
 enum error_management {
 /*first spare area location on first page of each block*/
-	FIRST_PAGE = 0x1,
+	PST_FIRST_PAGE = 0x1,
 /*first spare area location on first page and second page of each block*/
-	FIRST_TWO_PAGES = 0x11,
+	PST_FIRST_TWO_PAGES = 0x11,
 /*first spare area location on last page of each block*/
-	LAST_PAGE = 0x2,
+	PST_LAST_PAGE = 0x2,
 /*first spare area location on last two page of each block*/
-	LAST_TWO_PAGES = 0x22,
+	PST_LAST_TWO_PAGES = 0x22,
+/*first spare area location on first and last page of each block*/
+	PST_FIRST_AND_LAST_PAGES = 0x4,
+/*first spare area location on first two and last page of each block*/
+	PST_FIRST_TWO_AND_LAST_PAGES = 0x8,
 };
 
 struct aw_nand_flash_dev {
@@ -1032,16 +1046,20 @@ struct select_chip {
 
 struct aw_nand_chip_cache {
 #define INVALID_CACHE (-1)
-	uint32_t pageno;
-	uint32_t oobno;
-	/*pagebuf len*/
-	int page_len;
-	/*valid data size in pagebuf*/
-	int valid_page_len;
-	uint8_t *pagebuf;
-	int oob_len;
+	uint32_t simu_pageno;
+	uint32_t simu_oobno;
+	int simu_page_len;
+	/*valid data size in simup pagebuf start*/
+	int valid_col;
+	/*valid data size in simu pagebuf len from valid col*/
+	int valid_len;
+	uint8_t *simu_pagebuf;
+	/*valid data size in simu oob start*/
+	int valid_oob_col;
+	/*valid data size in simu oob len from valid oob col*/
 	int valid_oob_len;
-	uint8_t *oobbuf;
+	int simu_oob_len;
+	uint8_t *simu_oobbuf;
 	uint8_t bitflips;
 	int sub_page_len;
 	int chipno;
@@ -1115,7 +1133,7 @@ struct aw_nand_chip {
 	struct select_chip selected_chip;
 	struct ce_info ceinfo[MAX_CHIPS];
 
-	struct aw_nand_chip_cache buffer;
+	struct aw_nand_chip_cache simu_chip_buffer;
 
 	struct rawnand_data_interface data_interface;
 #define BBT_B_INVALID	(2)

@@ -285,6 +285,43 @@ unsigned char bmu_axp81X_set_reg_value(unsigned char reg_addr, unsigned char reg
 	return reg;
 }
 
+int bmu_axp81X_set_ntc_onff(int onoff)
+{
+	unsigned char reg_value;
+	if (!onoff) {
+		if (pmic_bus_read(AXP81X_RUNTIME_ADDR, AXP81X_ADC_EN, &reg_value))
+			return -1;
+
+		reg_value &= ~(1 << 0);
+		if (pmic_bus_write(AXP81X_RUNTIME_ADDR, AXP81X_ADC_EN, reg_value))
+			return -1;
+
+		if (pmic_bus_read(AXP81X_RUNTIME_ADDR, AXP81X_ADC_SPEED_TS, &reg_value))
+			return -1;
+
+		reg_value |= (1 << 2);
+		reg_value &= ~(3 << 0);
+		if (pmic_bus_write(AXP81X_RUNTIME_ADDR, AXP81X_ADC_SPEED_TS, reg_value))
+			return -1;
+	} else {
+		if (pmic_bus_read(AXP81X_RUNTIME_ADDR, AXP81X_ADC_EN, &reg_value))
+			return -1;
+
+		reg_value |= (1 << 0);
+		if (pmic_bus_write(AXP81X_RUNTIME_ADDR, AXP81X_ADC_EN, reg_value))
+			return -1;
+
+		if (pmic_bus_read(AXP81X_RUNTIME_ADDR, AXP81X_ADC_SPEED_TS, &reg_value))
+			return -1;
+
+		reg_value &= ~(1 << 2);
+		reg_value |= (3 << 0);
+		if (pmic_bus_write(AXP81X_RUNTIME_ADDR, AXP81X_ADC_SPEED_TS, reg_value))
+			return -1;
+
+	}
+	return 0;
+}
 
 U_BOOT_AXP_BMU_INIT(bmu_axp81X) = {
 	.bmu_name		  = "bmu_axp81X",
@@ -302,5 +339,6 @@ U_BOOT_AXP_BMU_INIT(bmu_axp81X) = {
 	.get_reg_value	   = bmu_axp81X_get_reg_value,
 	.set_reg_value	   = bmu_axp81X_set_reg_value,
 	.reset_capacity	   = bmu_axp81X_reset_capacity,
+	.set_ntc_onoff     = bmu_axp81X_set_ntc_onff,
 };
 

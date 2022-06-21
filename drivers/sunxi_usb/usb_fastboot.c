@@ -27,6 +27,8 @@
 #include "../../sprite/sparse/sparse.h"
 #include <android_misc.h>
 #include <sunxi_avb.h>
+#include <asm/arch/efuse.h>
+#include <sunxi_image_verifier.h>
 DECLARE_GLOBAL_DATA_PTR;
 
 /* int do_go(cmd_tbl_t *cmdtp, int flag, int argc, char *const argv[]); */
@@ -69,6 +71,12 @@ sunxi_secure_object_write(const char *item_name, char *buffer, int length)
 {
 	return 0;
 }
+
+int __attribute__((weak)) sunxi_verify_toc1_root_cert(void *buffer)
+{
+	return 0;
+}
+
 
 /*
 *******************************************************************************
@@ -812,6 +820,17 @@ static void __flash_to_uboot(void)
 		return;
 	}
 
+	if (sid_get_security_status()) {
+		ret = sunxi_verify_toc1_root_cert(temp_buf);
+		if (ret) {
+			printf("sunxi fastboot error: check toc1 root key fail\n");
+			sprintf(response,
+			"FAILdownload:check toc1 root key fail \n");
+			__sunxi_fastboot_send_status(response, strlen(response));
+			return;
+		}
+	}
+
 	printf("ready to download bytes 0x%x\n", trans_data.try_to_recv);
 	ret = sunxi_sprite_download_uboot((char *)temp_buf,
 					  get_boot_storage_type(), 1);
@@ -1530,7 +1549,7 @@ static int sunxi_fastboot_init(void)
 	printf("recv addr 0x%lx\n", (ulong)trans_data.base_recv_buffer);
 	printf("send addr 0x%lx\n", (ulong)trans_data.base_send_buffer);
 	printf("start to display fastbootlogo.bmp\n");
-#ifdef CONFIG_CMD_SUNXI_BMP
+#if defined(CONFIG_CMD_SUNXI_BMP) || defined(CONFIG_SUNXI_TV_FASTLOGO)
 	sunxi_bmp_display("fastbootlogo.bmp");
 #endif
 	char *p = NULL;

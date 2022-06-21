@@ -3277,8 +3277,17 @@ void mmc_update_config_for_dragonboard(int card_no)
 
 	nodeoffset = fdt_path_offset(working_fdt, prop_path);
 	if (nodeoffset < 0) {
-		MMCINFO("can't find node \"%s\" \n", prop_path);
-		return ;
+		MMCINFO("can't find node \"%s\" try sunxi_mmc\n", prop_path);
+		if (card_no == 2)
+			strcpy(prop_path, "suxni_mmc2");
+		else
+			strcpy(prop_path, "sunxi_mmc3");
+
+		nodeoffset = fdt_path_offset(working_fdt, prop_path);
+		if (nodeoffset < 0) {
+			MMCINFO("can't find node \"%s\"\n", prop_path);
+			return ;
+		}
 	}
 	ret = fdt_delprop(working_fdt, nodeoffset, "mmc-hs400-1_8v");
 	if (ret == 0) {
@@ -3342,11 +3351,22 @@ void mmc_update_config_for_sdly(struct mmc *mmc)
 		strcpy(prop_path, "mmc0");
 	else
 		strcpy(prop_path, "mmc3");
+
 	nodeoffset = fdt_path_offset(working_fdt, prop_path);
 	if (nodeoffset < 0) {
-		MMCINFO("can't find node \"%s\",will add new node\n",
-				prop_path);
-		goto __ERROR_END;
+		MMCINFO("can't find node \"%s\" try sunxi-mmc\n", prop_path);
+		if (priv->mmc_no == 2)
+			strcpy(prop_path, "sunxi_mmc2");
+		else if (priv->mmc_no == 0)
+			strcpy(prop_path, "sunxi_mmc0");
+		else
+			strcpy(prop_path, "sunxi_mmc3");
+		nodeoffset = fdt_path_offset(working_fdt, prop_path);
+		if (nodeoffset < 0) {
+			MMCINFO("can't find node \"%s\" \n",
+					prop_path);
+			goto __ERROR_END;
+		}
 	}
 
 	f3210 = sdly->tm4_smx_fx[0 * 2 + 0]; //sdly->tm4_sm0_f3210;
@@ -3794,6 +3814,7 @@ int mmc_init(struct mmc *mmc)
 			MMCINFO("%s: mmc init fail, err %d\n", __FUNCTION__, err);
 			goto ERR_RET;
 		}
+
 		if (work_mode == WORK_MODE_BOOT && cfg->sample_mode == AUTO_SAMPLE_MODE) {
 			if (cfg->force_boot_tuning)
 				need_tuning = 1;
@@ -3801,8 +3822,23 @@ int mmc_init(struct mmc *mmc)
 				if (((priv_info->ext_para0 & 0xFF000000) == EXT_PARA0_ID)
 					&& (priv_info->ext_para0 & EXT_PARA0_TUNING_SUCCESS_FLAG))
 					MMCDBG("%s: tuning procedure is executed!\n", __FUNCTION__);
-				else
-					need_tuning = 1;
+				else {
+
+					/* if boot0 didn't read mmc parameter or have any other problems, try to read it here.*/
+					err = mmc_read_info(priv->mmc_no, NULL,
+					  SUNXI_SDMMC_PARAMETER_REGION_SIZE_BYTE - sizeof(struct sunxi_sdmmc_parameter_region_header), (void *)priv_info);
+					if (err) {
+						MMCINFO("%s: read mmc parameter fail, err %d\n", __FUNCTION__, err);
+						need_tuning = 1;
+					} else if (((priv_info->ext_para0 & 0xFF000000) == EXT_PARA0_ID)
+					&& (priv_info->ext_para0 & EXT_PARA0_TUNING_SUCCESS_FLAG)) {
+						need_tuning = 0;
+						MMCDBG("%s: read mmc parameter ok\n", __FUNCTION__);
+					} else {
+						need_tuning = 1;
+					}
+				}
+
 			}
 
 			if (need_tuning) {

@@ -76,6 +76,7 @@ int axp_set_power_supply_output(void)
 	const char *twi_regu_name;
 	char pmu_node_str[8] = {0};
 	char twi_path[128] = {0};
+	int work_mode = get_boot_work_mode();
 
 #ifdef CONFIG_SUNXI_TRY_POWER_SPLY
 	char axp_name[16] = {0}, chipid;
@@ -141,13 +142,22 @@ int axp_set_power_supply_output(void)
 		onoff       = -1;
 		power_vol_d = 0;
 
-		if (power_vol > 10000) {
+		if (power_vol > 1100000) {
+			if (work_mode != WORK_MODE_BOOT) {
+				onoff       = 0;
+			} else {
+				onoff       = 1;
+			}
+			power_vol_d = power_vol % 10000;
+		} else if (power_vol > 10000) {
 			onoff       = 1;
 			power_vol_d = power_vol % 10000;
+
 		} else if (power_vol >= 0) {
 			onoff       = 0;
 			power_vol_d = power_vol;
 		}
+
 		debug("%s = %d, onoff=%d\n", power_name, power_vol_d, onoff);
 
 		if (pmu_set_voltage(power_name, power_vol_d, onoff)) {
@@ -322,7 +332,6 @@ int axp_reset_capacity(void)
 	return bmu_reset_capacity();
 }
 
-
 /* set dcdc pwm mode */
 int axp_set_dcdc_mode(void)
 {
@@ -357,7 +366,7 @@ int axp_set_dcdc_mode(void)
 int axp_battery_status_handle(void)
 {
 	int battery_status;
-	int ret = 0, bat_exist = 0;
+	int ret = 0, bat_exist = 0, ntc_status = -1;
 
 	ret = script_parser_fetch(FDT_PATH_POWER_SPLY, "battery_exist", &bat_exist, 1);
 	if (ret < 0)
@@ -369,6 +378,12 @@ int axp_battery_status_handle(void)
 	ret = bmu_get_battery_probe();
 	if (ret < 1)
 		return 0;
+
+	ret = script_parser_fetch(FDT_PATH_POWER_SPLY, "ntc_status", &ntc_status, 1);
+	if (ret < 0)
+		ntc_status = 1;
+
+	bmu_set_ntc_onoff(ntc_status);
 
 #ifdef CONFIG_AXP_LATE_INFO
 	battery_status = axp_get_battery_status();
@@ -416,11 +431,15 @@ int sunxi_update_axp_info(void)
 {
 	int val = -1;
 	char bootreason[16] = {0};
-	int ret = 0, bat_exist = 0;
+	int ret = 0, bat_exist = 0, charge_mode;
 
 	ret = script_parser_fetch(FDT_PATH_POWER_SPLY, "battery_exist", &bat_exist, 1);
 	if (ret < 0)
 		bat_exist = 1;
+
+	ret = script_parser_fetch(FDT_PATH_POWER_SPLY, "charge_mode", &charge_mode, 1);
+	if (ret < 0)
+		charge_mode = 1;
 
 #ifdef CONFIG_SUNXI_BMU
 #ifdef CONFIG_AXP_LATE_INFO
@@ -445,7 +464,7 @@ int sunxi_update_axp_info(void)
 		break;
 	case AXP_BOOT_SOURCE_CHARGER:
 		strncpy(bootreason, "charger", sizeof("charger"));
-		if (bat_exist)
+		if (bat_exist && charge_mode)
 			gd->chargemode = 1;
 		break;
 	case AXP_BOOT_SOURCE_BATTERY:

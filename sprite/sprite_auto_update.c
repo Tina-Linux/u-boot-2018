@@ -35,7 +35,7 @@ DECLARE_GLOBAL_DATA_PTR;
 #define SCRIPT_FILE_COMMENT '#' // symbol for comment
 #define SCRIPT_FILE_END '%' // symbol for file end
 #define MAX_LINE_SIZE 8000
-#define MAX_FILE_SIZE (0x1000000)
+#define MAX_FILE_SIZE (0x800000)
 #define IS_COMMENT(x) (SCRIPT_FILE_COMMENT == (x))
 #define IS_FILE_END(x) (SCRIPT_FILE_END == (x))
 #define IS_LINE_END(x) ('\r' == (x) || '\n' == (x))
@@ -44,7 +44,7 @@ DECLARE_GLOBAL_DATA_PTR;
 #if defined(CONFIG_SUNXI_SPINOR)
 #define AU_ONCE_DATA_DEAL (2 * 1024 * 1024)
 #else
-#define AU_ONCE_DATA_DEAL (16 * 1024 * 1024)
+#define AU_ONCE_DATA_DEAL (3 * 1024 * 1024)
 #endif
 #define AU_ONCE_SECTOR_DEAL (AU_ONCE_DATA_DEAL / 512)
 #define IMG_NAME "update/FIRMWARE.bin"
@@ -96,7 +96,7 @@ loff_t fat_fs_read(const char *filename, void *buf, int offset, int len)
 	if ((buf == NULL) || (filename == NULL))
 		return -1;
 
-	sprintf(temp_str, "fatload %s 0 0x%x %s 0x%x 0x%x", interface, (u32)buf, filename, len, offset);
+	sprintf(temp_str, "fatload %s 0 0x%lx %s 0x%x 0x%x", interface, (unsigned long)buf, filename, len, offset);
 	run_command(temp_str, 0);
 	return env_get_hex("filesize", 0);
 }
@@ -916,7 +916,8 @@ int do_auto_update_check(cmd_tbl_t *cmdtp, int flag, int argc, char *const argv[
 		return sunxi_auto_update_main();
 	} else if (inited == 1) {
 		memset(file_buff, 0, MAX_FILE_SIZE);
-		sprintf(temp_buf, "fatload %s 0 0x%x scripts/auto_update.txt", interface, (u32)file_buff);
+
+		sprintf(temp_buf, "fatload %s 0 0x%lx scripts/auto_update.txt", interface, (unsigned long)file_buff);
 		run_command(temp_buf, 0);
 		commands = get_script_next_line(file_buff, &arg_max);
 		for (i = 0; i < arg_max; i++) {
@@ -930,18 +931,19 @@ int do_auto_update_check(cmd_tbl_t *cmdtp, int flag, int argc, char *const argv[
 				pr_debug("file_size:0x%x temp_buf:%s\n", file_size, temp_buf);
 				if (file_size < MAX_FILE_SIZE) {
 					memset(file_buff, 0, MAX_FILE_SIZE);
-					sprintf(temp_buf, "fatload %s 0 0x%x %s;%s %s 0x%x %s",
-							interface, (u32)file_buff, commands[i].argv[2],
-							commands[i].argv[0], commands[i].argv[1], (u32)file_buff, commands[i].argv[3]);
+
+					sprintf(temp_buf, "fatload %s 0 0x%lx %s;%s %s 0x%lx %s",
+							interface, (unsigned long)file_buff, commands[i].argv[2],
+							commands[i].argv[0], commands[i].argv[1], (unsigned long)file_buff, commands[i].argv[3]);
 					pr_debug("temp_buf:%s\n", temp_buf);
 					run_command(temp_buf, 0);
 					mdelay(10);
 				} else {
 					for (file_offset = 0; file_offset < ALIGN(file_size, MAX_FILE_SIZE); file_offset += MAX_FILE_SIZE) {
 						memset(file_buff, 0, MAX_FILE_SIZE);
-						sprintf(temp_buf, "fatload %s 0 0x%x %s 0x%x 0x%x;%s %s 0x%x %s 0x%x 0x%x",
-								interface, (u32)file_buff, commands[i].argv[2], MAX_FILE_SIZE, file_offset,
-								commands[i].argv[0], commands[i].argv[1], (u32)file_buff, commands[i].argv[3], file_offset,
+						sprintf(temp_buf, "fatload %s 0 0x%lx %s 0x%x 0x%x;%s %s 0x%lx %s 0x%x 0x%x",
+								interface, (unsigned long)file_buff, commands[i].argv[2], MAX_FILE_SIZE, file_offset,
+								commands[i].argv[0], commands[i].argv[1], (unsigned long)file_buff, commands[i].argv[3], file_offset,
 								file_size - file_offset < MAX_FILE_SIZE ? file_size - file_offset : MAX_FILE_SIZE);
 						pr_debug("temp_buf:%s\n", temp_buf);
 						run_command(temp_buf, 0);
@@ -953,8 +955,6 @@ int do_auto_update_check(cmd_tbl_t *cmdtp, int flag, int argc, char *const argv[
 	}
 	return 0;
 }
-
-
 U_BOOT_CMD(auto_update_check, CONFIG_SYS_MAXARGS, 1, do_auto_update_check,
 	"auto_update_v2   - Do TFCard of Udisk update\n",
 	"\nnote:\n"

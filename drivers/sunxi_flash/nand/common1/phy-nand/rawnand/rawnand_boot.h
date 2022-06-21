@@ -2,7 +2,8 @@
 
 #ifndef __RAWNAND_BOOT_H__
 #define __RAWNAND_BOOT_H__
-#include "../nand-partition/phy.h"
+//#include "../nand-partition/phy.h"
+#include <sunxi_nand_partitions.h>
 #include <private_boot0.h>
 
 

@@ -493,8 +493,8 @@ int sunxi_efuse_read(void *key_name, void *rd_buf, int *len)
 		EFUSE_DBG("bit lft is %d\n", bit_lft);
 		tmp = sid_read_key(offset);
 		memcpy((void *)(u8_p + k_u32_l * 4), (void *)(&tmp),
-		       EFUSE_ROUND_UP(bit_lft, 8));
-		tmp_sz += EFUSE_ROUND_UP(bit_lft, 8);
+		       EFUSE_ROUND_UP(bit_lft, 8)/8);
+		tmp_sz += EFUSE_ROUND_UP(bit_lft, 8)/8;
 	}
 	*len = tmp_sz;
 
@@ -511,10 +511,43 @@ int sunxi_efuse_get_rotpk_status(void)
 {
 	int ret;
 	ret = (readl(SID_ROTPK_CTRL) & (1 << SID_ROTPK_EFUSED_BIT)) ==
-	      (1 << SID_ROTPK_EFUSED_BIT);
+		(1 << SID_ROTPK_EFUSED_BIT);
 	return ret;
 }
 #endif
+
+int sunxi_efuse_verify_rotpk(u8 *hash)
+{
+#ifdef SID_ROTPK_CMP_RET_BIT
+	int i;
+	u32 *tmp = (u32 *)hash;
+	u32 val;
+
+	for (i = 0; i < 8 ; i++) {
+		writel(tmp[i], SID_ROTPK_VALUE(i));
+	}
+
+	val = readl(SID_ROTPK_CTRL);
+	val |= (0x1U << 31);
+	writel(val, SID_ROTPK_CTRL);
+
+	for (i = 0; i < 30; i++) {
+		;
+	}
+
+	val = readl(SID_ROTPK_CTRL);
+	if (val & (1 << SID_ROTPK_EFUSED_BIT)) {
+		if (val & (1 << SID_ROTPK_CMP_RET_BIT)) {
+			return 0;
+		}
+		return -2;
+	}
+	pr_err("rotpk not init\n");
+	return 0;
+#else
+	return -1;
+#endif
+}
 
 #ifdef SID_GET_SOC_VER
 int sunxi_efuse_get_soc_ver(void)

@@ -6,8 +6,8 @@
  * SPDX-License-Identifier:	GPL-2.0+
  */
 
-#ifndef _SUNXI_CLOCK_SUN50IW11_H
-#define _SUNXI_CLOCK_SUN50IW11_H
+#ifndef _SUNXI_CLOCK_SUN20IW1_H
+#define _SUNXI_CLOCK_SUN20IW1_H
 
 struct sunxi_ccm_reg {
 	u32 pll1_cfg;		/* 0x000 pll1 (cpux) control */
@@ -332,4 +332,16 @@ struct sunxi_ccm_reg {
 #define CE_MBUS_GATING_MASK               (1)
 #define CE_MBUS_GATING_BIT		  (2)
 #define CE_MBUS_GATING			  (1)
-#endif /* _SUNXI_CLOCK_SUN50IW11_H */
+
+//usb
+#define USBEHCI0_RST_BIT 20
+#define USBEHCI0_GATIING_BIT 4
+#define USBPHY0_RST_BIT 30
+#define USBPHY0_SCLK_GATING_BIT 29
+
+#define USBEHCI1_RST_BIT 21
+#define USBEHCI1_GATIING_BIT 5
+#define USBPHY1_RST_BIT 30
+#define USBPHY1_SCLK_GATING_BIT 29
+
+#endif /* _SUNXI_CLOCK_SUN20IW1_H */

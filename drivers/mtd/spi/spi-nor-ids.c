@@ -125,9 +125,15 @@ const struct flash_info spi_nor_ids[] = {
 			SPI_NOR_HAS_LOCK | SPI_NOR_HAS_TB)
 	},
 	{
-		INFO("gd25q256", 0xc84019, 0x0, 64 * 1024, 256,
+		INFO("gd25q256", 0xc84019, 0x0, 64 * 1024, 512,
 			SECT_4K | SPI_NOR_DUAL_READ |
-			SPI_NOR_HAS_LOCK | SPI_NOR_HAS_TB)
+			SPI_NOR_HAS_LOCK | SPI_NOR_HAS_TB |
+			SPI_NOR_4B_OPCODES)
+	},
+	{
+		INFO("gd25f256f", 0xc84319, 0x0, 64 * 1024, 512,
+			SPI_NOR_DUAL_READ | SPI_NOR_QUAD_READ |
+			SPI_NOR_4B_OPCODES)
 	},
 #endif
 #ifdef CONFIG_SPI_FLASH_ISSI		/* ISSI */

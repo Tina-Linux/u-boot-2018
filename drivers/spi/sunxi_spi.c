@@ -8,6 +8,7 @@
  */
 
 #include <common.h>
+#include <dm.h>
 #include <malloc.h>
 #include <memalign.h>
 #include <spi.h>
@@ -24,6 +25,9 @@
 #include <sys_config.h>
 #include <fdt_support.h>
 #include <linux/mtd/spi-nor.h>
+#include <private_boot0.h>
+#include <private_toc.h>
+#include "../mtd/spi/sf_internal.h"
 
 #ifdef CONFIG_SPI_USE_DMA
 static sunxi_dma_set *spi_tx_dma;
@@ -57,15 +61,12 @@ static uint spi_rx_dma_hd;
 #define SUNXI_SPI_FAIL -1
 
 static int sunxi_get_spic_clk(int bus);
+struct sunxi_spi_slave *g_sspi;
 
-struct sunxi_spi_slave {
-	struct spi_slave	slave;
-	uint32_t		max_hz;
-	uint32_t		mode;
-	int             cs_bitmap;/* cs0- 0x1; cs1-0x2, cs0&cs1-0x3. */
-	uint32_t        cdr;
-	uint32_t	    base_addr;
-};
+struct sunxi_spi_slave *get_sspi(void)
+{
+	return g_sspi;
+}
 
 #if SPI_DEBUG
 static void spi_print_info(struct sunxi_spi_slave *sspi)
@@ -183,23 +184,80 @@ static s32 spi_set_cs(u32 chipselect, void __iomem *base_addr)
 	return ret;
 }
 
+static void spi_set_sdm(void __iomem *base_addr, unsigned int smod)
+{
+	unsigned int rval = readl(base_addr + SPI_TC_REG) & (~SPI_TC_SDM);
+
+	if (smod)
+		rval |= SPI_TC_SDM;
+	writel(rval, base_addr + SPI_TC_REG);
+}
+
+static void spi_set_sdc(void __iomem *base_addr, unsigned int sample)
+{
+	unsigned int rval = readl(base_addr + SPI_TC_REG) & (~SPI_TC_SDC);
+
+	if (sample)
+		rval |= SPI_TC_SDC;
+	writel(rval, base_addr + SPI_TC_REG);
+}
+
+static void spi_set_sdc1(void __iomem *base_addr, unsigned int sample)
+{
+	unsigned int rval = readl(base_addr + SPI_TC_REG) & (~SPI_TC_SDC1);
+
+	if (sample)
+		rval |= SPI_TC_SDC1;
+	writel(rval, base_addr + SPI_TC_REG);
+}
+
+static void spi_set_sample_mode(void __iomem *base_addr, unsigned int mode)
+{
+	unsigned int sample_mode[7] = {
+		DELAY_NORMAL_SAMPLE, DELAY_0_5_CYCLE_SAMPLE,
+		DELAY_1_CYCLE_SAMPLE, DELAY_1_5_CYCLE_SAMPLE,
+		DELAY_2_CYCLE_SAMPLE, DELAY_2_5_CYCLE_SAMPLE,
+		DELAY_3_CYCLE_SAMPLE
+	};
+	spi_set_sdm(base_addr, (sample_mode[mode] >> 8) & 0xf);
+	spi_set_sdc(base_addr, (sample_mode[mode] >> 4) & 0xf);
+	spi_set_sdc1(base_addr, sample_mode[mode] & 0xf);
+}
+
+static void spi_set_sample_delay(void __iomem  *base_addr,
+		unsigned int sample_delay)
+{
+	unsigned int rval = readl(base_addr + SPI_SDC_REG)&(~(0x3f << 0));
+
+	rval |= sample_delay;
+	writel(rval, base_addr + SPI_SDC_REG);
+}
+
 /* config spi */
-static void spi_config_tc(u32 master, u32 config, void __iomem *base_addr)
+static void spi_config_tc(struct sunxi_spi_slave *sspi, u32 master,
+		u32 config, void __iomem *base_addr)
 {
 	u32 reg_val = readl(base_addr + SPI_TC_REG);
-	reg_val = SPI_TC_DHB | SPI_TC_SS_LEVEL | SPI_TC_SPOL;
-
 	uint sclk_freq = 0;
 
 	sclk_freq = sunxi_get_spic_clk(0);
-	if (sclk_freq >= 60000000)
-		reg_val |= SPI_TC_SDC;
-	else if (sclk_freq <= 24000000)
-		reg_val |= SPI_TC_SDM;
-	else
-		reg_val &= ~(SPI_TC_SDM | SPI_TC_SDC);
 
+	if (sspi->right_sample_delay == SAMP_MODE_DL_DEFAULT) {
+		if (sclk_freq >= 60000000)
+			reg_val |= SPI_TC_SDC;
+		else if (sclk_freq <= 24000000)
+			reg_val |= SPI_TC_SDM;
+		else
+			reg_val &= ~(SPI_TC_SDM | SPI_TC_SDC);
+	} else {
+		spi_set_sample_mode(base_addr, sspi->right_sample_mode);
+		spi_set_sample_delay(base_addr, sspi->right_sample_delay);
+		reg_val = readl(base_addr + SPI_TC_REG);
+	}
+
+	reg_val |= SPI_TC_DHB | SPI_TC_SS_LEVEL | SPI_TC_SPOL;
 	writel(reg_val, base_addr + SPI_TC_REG);
+
 #if 0
 	/*1. POL */
 	if (config & SPI_POL_ACTIVE_)
@@ -483,6 +541,30 @@ static void spi_enable_quad(void __iomem  *base_addr)
 	writel(reg_val, base_addr + SPI_BCC_REG);
 }
 
+void spi_samp_dl_sw_status(void __iomem  *base_addr, unsigned int status)
+{
+	unsigned int rval = readl(base_addr + SPI_SDC_REG);
+
+	if (status)
+		rval |= SPI_SAMP_DL_SW_EN;
+	else
+		rval &= ~SPI_SAMP_DL_SW_EN;
+
+	writel(rval, base_addr +  SPI_SDC_REG);
+}
+
+static void spi_samp_mode(void __iomem  *base_addr, unsigned int status)
+{
+	unsigned int rval = readl(base_addr + SPI_GC_REG);
+
+	if (status)
+		rval |= SPI_SAMP_MODE_EN;
+	else
+		rval &= ~SPI_SAMP_MODE_EN;
+
+	writel(rval, base_addr + SPI_GC_REG);
+}
+
 static int sunxi_spi_mode_check(void __iomem  *base_addr, u32 tcnt, u32 rcnt, u8 cmd)
 {
 	/* single mode transmit counter*/
@@ -546,7 +628,14 @@ static int sunxi_spi_gpio_init(void)
 
 	sunxi_gpio_set_pull(SUNXI_GPC(1), 1);
 	sunxi_gpio_set_pull(SUNXI_GPC(10), 1);
+#elif defined(CONFIG_MACH_SUN8IW11)
+	sunxi_gpio_set_cfgpin(SUNXI_GPC(2), SUNXI_GPC_SPI0); /*spi0_sclk */
+	sunxi_gpio_set_cfgpin(SUNXI_GPC(23), SUNXI_GPC_SPI0); /*spi0_cs0*/
 
+	sunxi_gpio_set_cfgpin(SUNXI_GPC(0), SUNXI_GPC_SPI0); /*spi0_mosi*/
+	sunxi_gpio_set_cfgpin(SUNXI_GPC(1), SUNXI_GPC_SPI0); /*spi0_miso*/
+
+	sunxi_gpio_set_pull(SUNXI_GPC(23), 1);
 #elif  defined(CONFIG_MACH_SUN8IW18)
 	sunxi_gpio_set_cfgpin(SUNXI_GPC(0), SUN50I_GPC_SPI0); /*spi0_sclk */
 	sunxi_gpio_set_cfgpin(SUNXI_GPC(3), SUN50I_GPC_SPI0); /*spi0_cs0*/
@@ -595,9 +684,13 @@ static int sunxi_spi_clk_init(u32 bus, u32 mod_clk)
 	rval = (1U << 31);
 	source_clk = 24000000;
 #else
+#if defined(CONFIG_MACH_SUN8IW21)
+	source_clk = 300000000;
+#else
 	source_clk = clock_get_pll6() * 1000000;
-	SPI_INF("source_clk: %d Hz, mod_clk: %d Hz\n", source_clk, mod_clk);
-	
+#endif
+	SPI_DBG("source_clk: %d Hz, mod_clk: %d Hz\n", source_clk, mod_clk);
+
 	div = (source_clk + mod_clk - 1) / mod_clk;
 	div = div == 0 ? 1 : div;
 	if (div > 128) {
@@ -619,10 +712,23 @@ static int sunxi_spi_clk_init(u32 bus, u32 mod_clk)
 	}
 
 	factor_m = m - 1;
+#if defined(CONFIG_MACH_SUN8IW11)
+	rval = (1U << 31) | (0x1 << 24) | (n << 16) | factor_m;
+#else
 	rval = (1U << 31) | (0x1 << 24) | (n << 8) | factor_m;
+#endif
 
 #endif
 	writel(rval, (volatile void __iomem *)mclk_base);
+
+#if defined(CONFIG_MACH_SUN8IW11)
+	/* spi reset */
+	writel(readl(&ccm->ahb_reset0_cfg) & ~(1 << 20), &ccm->ahb_reset0_cfg);
+	writel(readl(&ccm->ahb_reset0_cfg) | (1 << 20), &ccm->ahb_reset0_cfg);
+
+	/* spi gating */
+	writel(readl(&ccm->ahb_gate0) | (1 << 20), &ccm->ahb_gate0);
+#else
 	/* spi reset */
 	setbits_le32(&ccm->spi_gate_reset, (0<<RESET_SHIFT));
 	setbits_le32(&ccm->spi_gate_reset, (1<<RESET_SHIFT));
@@ -630,8 +736,9 @@ static int sunxi_spi_clk_init(u32 bus, u32 mod_clk)
 	/* spi gating */
 	setbits_le32(&ccm->spi_gate_reset, (1<<GATING_SHIFT));
 	/*sclk_freq = source_clk / (1 << n) / m*/
+#endif
 
-	SPI_INF("src: %d Hz, spic:%d Hz,  n=%d, m=%d\n",source_clk, source_clk/ (1 << n) / m, n, m);
+	SPI_DBG("src: %d Hz, spic:%d Hz,  n=%d, m=%d\n",source_clk, source_clk/ (1 << n) / m, n, m);
 
 	return 0;
 }
@@ -655,7 +762,11 @@ static int sunxi_get_spic_clk(int bus)
 			clk = 24000000;
 			break;
 		case 1:
+#if defined(CONFIG_MACH_SUN8IW21)
+			clk = 300000000;
+#else
 			clk = clock_get_pll6() * 1000000;
+#endif
 			break;
 		default:
 			clk = 0;
@@ -672,12 +783,21 @@ static int sunxi_spi_clk_exit(void)
 {
 	struct sunxi_ccm_reg *const ccm =
 		(struct sunxi_ccm_reg *)SUNXI_CCM_BASE;
+
+#if defined(CONFIG_MACH_SUN8IW11)
+	/* clr spi gating */
+	writel(readl(&ccm->ahb_gate0) & ~(1 << 20), &ccm->ahb_gate0);
+
+	/* clr spi reset */
+	writel(readl(&ccm->ahb_reset0_cfg) & ~(1 << 20), &ccm->ahb_reset0_cfg);
+
+#else
 	/* spi gating */
 	clrbits_le32(&ccm->spi_gate_reset, 1<<GATING_SHIFT);
-	
+
 	/* spi reset */
 	clrbits_le32(&ccm->spi_gate_reset, 1<<RESET_SHIFT);
-	
+#endif
 	return 0;
 }
 
@@ -955,10 +1075,13 @@ void spi_init_clk(struct spi_slave *slave)
 			sunxi_slave->max_hz = rval;
 	}
 
-	printf("spi sunxi_slave->max_hz:%d \n", sunxi_slave->max_hz);
+	pr_force("spi sunxi_slave->max_hz:%d \n", sunxi_slave->max_hz);
 	/* clock */
 	if (sunxi_spi_clk_init(0, sunxi_slave->max_hz))
-		printf("spi clk init error\n");
+		pr_err("spi clk init error\n");
+
+	spi_config_tc(sunxi_slave, 1, SPI_MODE_3,
+			(void __iomem *)(unsigned long)sunxi_slave->base_addr);
 
 	return;
 }
@@ -991,8 +1114,11 @@ struct spi_slave *spi_setup_slave(unsigned int bus, unsigned int cs,
 	sunxi_slave->mode = mode;
 	sunxi_slave->cdr = 0;
 	sunxi_slave->base_addr = SUNXI_SPI0_BASE + bus*SUNXI_SPI_PORT_OFFSET;
+	sunxi_slave->right_sample_delay = SAMP_MODE_DL_DEFAULT;
+	sunxi_slave->right_sample_mode = SAMP_MODE_DL_DEFAULT;
 
 	sunxi_slave->slave.mode = mode;
+	g_sspi = sunxi_slave;
 
 	/* gpio */
 	sunxi_spi_gpio_init();
@@ -1010,13 +1136,16 @@ struct spi_slave *spi_setup_slave(unsigned int bus, unsigned int cs,
 		return NULL;
 	}
 
+	spi_config_tc(sunxi_slave, 1, SPI_MODE_3,
+			(void __iomem *)(unsigned long)sunxi_slave->base_addr);
+
 	return &sunxi_slave->slave;
 
 }
 
 void spi_free_slave(struct spi_slave *slave)
 {
-	struct sunxi_spi_slave *sunxi_slave = to_sunxi_slave(slave);	
+	struct sunxi_spi_slave *sunxi_slave = to_sunxi_slave(slave);
 	SPI_ENTER();
 	free(sunxi_slave);
 
@@ -1034,7 +1163,7 @@ int spi_claim_bus(struct spi_slave *slave)
 	uint sclk_freq = 0;
 
 	SPI_ENTER();
-	
+
 	sclk_freq = sunxi_get_spic_clk(0);
 	if(!sclk_freq)
 		return -1;
@@ -1054,7 +1183,6 @@ int spi_claim_bus(struct spi_slave *slave)
 	/* 5. master : set POL,PHA,SSOPL,LMTF,DDB,DHB; default: SSCTL=0,SMC=1,TBW=0.
 	 * 6. set bit width-default: 8 bits
 	 */
-	spi_config_tc(1, SPI_MODE_3, base_addr);
 	spi_ss_level(base_addr, 1);
 	spi_enable_tp(base_addr);
 	/* 7. spi controller sends ss signal automatically*/
@@ -1073,6 +1201,185 @@ void spi_release_bus(struct spi_slave *slave)
 	/* disable the spi controller */
 	spi_disable_bus((void __iomem *)(unsigned long)sspi->base_addr);
 
+}
+
+void sunxi_update_right_delay_para(struct mtd_info *mtd)
+{
+	struct spi_nor *nor = mtd->priv;
+	struct spi_slave *slave = nor->spi;
+	struct sunxi_spi_slave *sspi = to_sunxi_slave(slave);
+	void __iomem *base_addr = (void *)(ulong)sspi->base_addr;
+	unsigned int sample_delay;
+	unsigned int start_backup = 0, end_backup = 0;
+	unsigned int mode, startry_mode = 0, endtry_mode = 6, block = 0;
+	unsigned int half_cycle_ps, sample_delay_ps = 155;
+	unsigned int min_delay = 0, max_delay = 0, right_sample_delay;
+	u8 erase_opcode = nor->erase_opcode;
+	uint32_t erasesize = mtd->erasesize;
+	nor->erase_opcode = SPINOR_OP_BE_4K;
+	mtd->erasesize = 4096;
+
+	size_t retlen;
+	u_char *cache_source;
+	u_char *cache_target;
+	u_char *cache_boot0;
+	int len = mtd->writesize;
+
+	struct erase_info instr;
+	instr.addr = block * mtd->erasesize;
+	instr.len = (endtry_mode - startry_mode + 1) * mtd->erasesize;
+
+	//sspi->msglevel &= ~sspi_MSG_EN;
+	cache_boot0 = calloc(1, instr.len);
+	mtd->_read(mtd, instr.addr, instr.len, &retlen, cache_boot0);
+	mtd->_erase(mtd, &instr);
+
+	/* re-initialize from device tree */
+	spi_init_clk(slave);
+	/* How much (ps) is required for half a cycle */
+	half_cycle_ps = 1 * 1000 * 1000  / (sspi->max_hz / 1000 / 1000) / 2;
+
+	cache_source = calloc(1, len);
+	cache_target = calloc(1, len);
+	memset(cache_source, 0xa5, len);
+
+	spi_samp_mode(base_addr, 1);
+	spi_samp_dl_sw_status(base_addr, 1);
+	for (mode = startry_mode; mode <= endtry_mode; mode++) {
+		spi_set_sample_mode(base_addr, mode);
+		for (sample_delay = 0; sample_delay < 64; sample_delay++) {
+			spi_set_sample_delay(base_addr, sample_delay);
+			mtd->_write(mtd, block * mtd->erasesize +
+					sample_delay * mtd->writesize,
+					len, &retlen, cache_source);
+		}
+
+		for (sample_delay = 0; sample_delay < 64; sample_delay++) {
+			spi_set_sample_delay(base_addr, sample_delay);
+			memset(cache_target, 0, len);
+			mtd->_read(mtd, block * mtd->erasesize +
+					sample_delay * mtd->writesize,
+					len, &retlen, cache_target);
+
+			if (strncmp((char *)cache_source, (char *)cache_target,
+						len) == 0) {
+				pr_debug("mode:%d delat:%d time:%dps[OK]\n",
+						mode, sample_delay,
+						mode * half_cycle_ps +
+						sample_delay * sample_delay_ps);
+				if (!start_backup) {
+					start_backup = mode * half_cycle_ps +
+						sample_delay * sample_delay_ps;
+					end_backup = mode * half_cycle_ps +
+						sample_delay * sample_delay_ps;
+				} else {
+					end_backup = mode * half_cycle_ps +
+						sample_delay * sample_delay_ps;
+				}
+			} else {
+				pr_debug("mode:%d delay:%d time:%dps [ERROR]\n",
+						mode, sample_delay,
+						mode * half_cycle_ps +
+						sample_delay * sample_delay_ps);
+				if (!start_backup)
+					continue;
+				else {
+					if (!min_delay)
+						min_delay = start_backup;
+					else if (start_backup < min_delay)
+						min_delay = start_backup;
+					if (end_backup > max_delay)
+						max_delay = end_backup;
+
+					start_backup = 0;
+					end_backup = 0;
+				}
+			}
+		}
+
+		if ((start_backup < min_delay || !min_delay) && start_backup)
+			min_delay = start_backup;
+		if (end_backup > max_delay)
+			max_delay = end_backup;
+
+		start_backup = 0;
+		end_backup = 0;
+
+		block++;
+	}
+
+	right_sample_delay = (min_delay + max_delay) / 2;
+	if (!right_sample_delay) {
+		spi_samp_mode(base_addr, 0);
+		spi_samp_dl_sw_status(base_addr, 0);
+		if ((sspi->max_hz / 1000 / 1000) >= 60)
+			sspi->right_sample_mode = DELAY_1_CYCLE_SAMPLE;
+		else if ((sspi->max_hz / 1000 / 1000) <= 24)
+			sspi->right_sample_mode = DELAY_NORMAL_SAMPLE;
+		else
+			sspi->right_sample_mode = DELAY_0_5_CYCLE_SAMPLE;
+	} else {
+		sspi->right_sample_delay =
+			(right_sample_delay % half_cycle_ps) / sample_delay_ps;
+		sspi->right_sample_mode =
+			right_sample_delay / half_cycle_ps;
+		spi_set_sample_delay(base_addr, sspi->right_sample_delay);
+	}
+	pr_info("Sample mode:%d  min_delay:%d max_delay:%d right_delay:%d)\n",
+			sspi->right_sample_mode,
+			min_delay, max_delay,
+			sspi->right_sample_delay);
+	spi_set_sample_mode(base_addr, sspi->right_sample_mode);
+
+	mtd->_write(mtd, instr.addr, instr.len, &retlen, cache_boot0);
+
+	//sspi->msglevel |= sspi_MSG_EN;
+	nor->erase_opcode = erase_opcode;
+	mtd->erasesize = erasesize;
+	free(cache_source);
+	free(cache_target);
+	free(cache_boot0);
+	return ;
+}
+
+int sunxi_set_right_delay_para(struct mtd_info *mtd)
+{
+	struct spi_nor *nor = mtd->priv;
+	struct spi_slave *slave = nor->spi;
+	struct sunxi_spi_slave *sspi = to_sunxi_slave(slave);
+	void __iomem *base_addr = (void *)(ulong)sspi->base_addr;
+	boot0_file_head_t *boot0;
+	boot_spinor_info_t *boot_info;
+	size_t retlen;
+	boot0 = calloc(1, 2048);
+
+	mtd->_read(mtd, 0, 2048, &retlen, (u_char *)boot0);
+
+	if(gd->bootfile_mode  == SUNXI_BOOT_FILE_NORMAL
+		 || gd->bootfile_mode  == SUNXI_BOOT_FILE_PKG) {
+		boot_info = (boot_spinor_info_t *)boot0->prvt_head.storage_data;
+	} else {
+		sbrom_toc0_config_t *toc0_config = NULL;
+
+		toc0_config = (sbrom_toc0_config_t *)(boot0 + 0x80);
+		boot_info = (boot_spinor_info_t *)toc0_config->storage_data;
+	}
+
+	pr_force("spi sample_mode:%d sample_delay:%d\n",
+			boot_info->sample_mode, boot_info->sample_delay);
+	spi_set_sample_mode(base_addr, boot_info->sample_mode);
+
+	if (boot_info->sample_delay != SAMP_MODE_DL_DEFAULT) {
+		spi_samp_mode(base_addr, 1);
+		spi_samp_dl_sw_status(base_addr, 1);
+		spi_set_sample_delay(base_addr, boot_info->sample_delay);
+		sspi->right_sample_delay = boot_info->sample_delay;
+		sspi->right_sample_mode = boot_info->sample_mode;
+	}
+
+	spi_init_clk(slave);
+	free(boot0);
+	return 0;
 }
 
 int spi_xfer(struct spi_slave *slave, unsigned int bitlen,
@@ -1121,7 +1428,7 @@ int spi_xfer(struct spi_slave *slave, unsigned int bitlen,
 
 	//spi_set_bc_tc_stc(tcnt+cmd_len, rcnt, stc, 0, base_addr);
 	sunxi_spi_mode_check(base_addr, tcnt+cmd_len, rcnt, cmd[0]);
-	spi_config_tc(1, SPI_MODE_3, base_addr);
+	//spi_config_tc(sspi, 1, SPI_MODE_3, base_addr);
 	spi_ss_level(base_addr, 1);
 	spi_start_xfer(base_addr);
 
@@ -1196,6 +1503,6 @@ int spi_xfer(struct spi_slave *slave, unsigned int bitlen,
 		return -1;
 	}
 	spi_clr_irq_pending(0xffffffff, base_addr);
-	
+
 	return 0;
 }

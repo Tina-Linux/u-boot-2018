@@ -93,6 +93,50 @@ int sunxi_md5_calc(u8 *dst_addr, u32 dst_len, u8 *src_addr, u32 src_len)
 	return 0;
 }
 
+int sunxi_hash_test(u8 *dst_addr, u32 dst_len, u8 *src_addr, u32 src_len, u32 sha_type)
+{
+	u32 total_bit_len					     = 0;
+	struct hash_task_descriptor task0 __aligned(CACHE_LINE_SIZE) = { 0 };
+	/* sha256  2word, sha512 4word*/
+	ALLOC_CACHE_ALIGN_BUFFER(u8, p_sign, CACHE_LINE_SIZE);
+	u32 md_size = dst_len;
+	memset(p_sign, 0, CACHE_LINE_SIZE);
+
+	memset((void *)&task0, 0x00, sizeof(task0));
+	total_bit_len = src_len * 8;
+	task0.ctrl    = (CHANNEL_0 << CHN) | (0x1 << LPKG) | (0x0 << DLAV) |
+		     (0x1 << IE);
+	task0.cmd = (sha_type << 0);
+	memcpy(task0.data_toal_len_addr, &total_bit_len, 4);
+	memcpy(task0.sg[0].source_addr, &src_addr, 4);
+	task0.sg[0].source_len = src_len;
+	memcpy(task0.sg[0].dest_addr, &p_sign, 4);
+	task0.sg[0].dest_len = md_size;
+
+	flush_cache(((u32)&task0), ALIGN(sizeof(task0), CACHE_LINE_SIZE));
+	flush_cache((u32)p_sign, CACHE_LINE_SIZE);
+	flush_cache(((u32)src_addr), ALIGN(src_len, CACHE_LINE_SIZE));
+
+	ss_set_drq((u32)&task0);
+	ss_irq_enable(CHANNEL_0);
+	ss_ctrl_start(HASH_RBG_TRPE);
+	ss_wait_finish(CHANNEL_0);
+	ss_pending_clear(CHANNEL_0);
+	ss_ctrl_stop();
+	ss_irq_disable(CHANNEL_0);
+	ss_set_drq(0);
+	if (ss_check_err(CHANNEL_0)) {
+		printf("SS %s fail 0x%x\n", __func__, ss_check_err(CHANNEL_0));
+		return -1;
+	}
+
+	invalidate_dcache_range((ulong)p_sign,
+				((ulong)p_sign) + CACHE_LINE_SIZE);
+	/*copy data*/
+	memcpy(dst_addr, p_sign, md_size);
+	return 0;
+}
+
 int sunxi_sha_calc(u8 *dst_addr, u32 dst_len, u8 *src_addr, u32 src_len)
 {
 	u32 total_bit_len					     = 0;
@@ -134,6 +178,89 @@ int sunxi_sha_calc(u8 *dst_addr, u32 dst_len, u8 *src_addr, u32 src_len)
 				((ulong)p_sign) + CACHE_LINE_SIZE);
 	/*copy data*/
 	memcpy(dst_addr, p_sign, md_size);
+	return 0;
+}
+
+s32 sunxi_sm2_test(struct sunxi_sm2_ctx_t *sm2_ctx)
+{
+	struct other_task_descriptor task0 __aligned(CACHE_LINE_SIZE) = { 0 };
+	u32 sm2_size_byte = sm2_ctx->sm2_size >> 3;
+	u32 sm2_size_word = sm2_ctx->sm2_size >> 5;
+	u32 mode = sm2_ctx->mode;
+	int i;
+
+	memset((void *)&task0, 0x00, sizeof(task0));
+
+	task0.task_id	     = CHANNEL_0;
+	task0.common_ctl     = (ALG_SM2 | (1U << 31));
+	task0.asymmetric_ctl = (sm2_size_word) | (mode << 16);
+
+	memcpy(task0.sg[0].source_addr, &sm2_ctx->k, 4);
+	task0.sg[0].source_len = sm2_ctx->k_len;
+	memcpy(task0.sg[1].source_addr, &sm2_ctx->p, 4);
+	task0.sg[1].source_len = sm2_size_byte;
+	memcpy(task0.sg[2].source_addr, &sm2_ctx->a, 4);
+	task0.sg[2].source_len = sm2_size_byte;
+	memcpy(task0.sg[3].source_addr, &sm2_ctx->gx, 4);
+	task0.sg[3].source_len = sm2_size_byte;
+	memcpy(task0.sg[4].source_addr, &sm2_ctx->gy, 4);
+	task0.sg[4].source_len = sm2_size_byte;
+	memcpy(task0.sg[5].source_addr, &sm2_ctx->n, 4);
+	task0.sg[5].source_len = sm2_size_byte;
+	memcpy(task0.sg[6].source_addr, &sm2_ctx->px, 4);
+	task0.sg[6].source_len = sm2_size_byte;
+	memcpy(task0.sg[7].source_addr, &sm2_ctx->py, 4);
+	task0.sg[7].source_len = sm2_size_byte;
+
+	for (i = 0; i < 8; i++) {
+		task0.data_len += task0.sg[i].source_len;
+	}
+	pr_err("data_len = %d\n", task0.data_len);
+	memcpy(task0.sg[0].dest_addr, &sm2_ctx->cx, 4);
+	task0.sg[0].dest_len = sm2_size_byte;
+	memcpy(task0.sg[1].dest_addr, &sm2_ctx->cy, 4);
+	task0.sg[1].dest_len = sm2_size_byte;
+	memcpy(task0.sg[2].dest_addr, &sm2_ctx->kx, 4);
+	task0.sg[2].dest_len = sm2_size_byte;
+	memcpy(task0.sg[3].dest_addr, &sm2_ctx->ky, 4);
+	task0.sg[3].dest_len = sm2_size_byte;
+	memcpy(task0.sg[4].dest_addr, &sm2_ctx->out, 4);
+	task0.sg[4].dest_len = sm2_size_byte;
+
+	flush_cache((u32)&task0, sizeof(task0));
+	flush_cache((u32)sm2_ctx->p, sm2_size_byte);
+	flush_cache((u32)sm2_ctx->a, sm2_size_byte);
+	flush_cache((u32)sm2_ctx->gx, sm2_size_byte);
+	flush_cache((u32)sm2_ctx->gy, sm2_size_byte);
+	flush_cache((u32)sm2_ctx->n, sm2_size_byte);
+	flush_cache((u32)sm2_ctx->px, sm2_size_byte);
+	flush_cache((u32)sm2_ctx->py, sm2_size_byte);
+
+
+	ss_set_drq((u32)&task0);
+	ss_irq_enable(task0.task_id);
+	ss_ctrl_start(ASYM_TRPE);
+	ss_wait_finish(task0.task_id);
+	ss_pending_clear(task0.task_id);
+	ss_ctrl_stop();
+	ss_irq_disable(task0.task_id);
+	if (ss_check_err(task0.task_id)) {
+		printf("SS %s fail 0x%x\n", __func__,
+		       ss_check_err(task0.task_id));
+		return -1;
+	}
+
+	invalidate_dcache_range((ulong)sm2_ctx->cx,
+				(ulong)sm2_ctx->cx + sm2_size_byte);
+	invalidate_dcache_range((ulong)sm2_ctx->cy,
+				(ulong)sm2_ctx->cy + sm2_size_byte);
+	invalidate_dcache_range((ulong)sm2_ctx->kx,
+				(ulong)sm2_ctx->kx + sm2_size_byte);
+	invalidate_dcache_range((ulong)sm2_ctx->ky,
+				(ulong)sm2_ctx->ky + sm2_size_byte);
+	invalidate_dcache_range((ulong)sm2_ctx->out,
+				(ulong)sm2_ctx->out + sm2_size_byte);
+
 	return 0;
 }
 
@@ -269,7 +396,7 @@ s32 sunxi_rsa_calc(u8 *n_addr, u32 n_len, u8 *e_addr, u32 e_len, u8 *dst_addr,
 
 int sunxi_aes_with_hardware(uint8_t *dst_addr, uint8_t *src_addr, int len,
 			    uint8_t *key, uint32_t key_len,
-			    uint32_t symmetric_ctl, uint8_t dir)
+			    uint32_t symmetric_ctl, uint32_t c_ctl)
 {
 	uint8_t __aligned(64) iv[16]			 = { 0 };
 	struct other_task_descriptor task0 __aligned(64) = { 0 };
@@ -286,7 +413,7 @@ int sunxi_aes_with_hardware(uint8_t *dst_addr, uint8_t *src_addr, int len,
 	destination_len = cts_size;
 
 	task0.task_id	    = 0;
-	task0.common_ctl    = (1U << 31) | (dir << 8) | _SUNXI_AES_CFG;
+	task0.common_ctl    = (1U << 31) | c_ctl;
 	task0.symmetric_ctl = symmetric_ctl;
 	memcpy(task0.key_addr, &key_map, 4);
 	memcpy(task0.iv_addr, &iv, 4);

@@ -19,12 +19,6 @@ void clock_init_uart(void)
 	struct sunxi_ccm_reg *const ccm =
 		(struct sunxi_ccm_reg *)SUNXI_CCM_BASE;
 
-	/* uart clock source is apb2 */
-	writel(APB2_CLK_SRC_OSC24M|
-	       APB2_CLK_RATE_N_1|
-	       APB2_CLK_RATE_M(1),
-	       &ccm->apb2_cfg);
-
 	/* open the clock for uart */
 	clrbits_le32(&ccm->uart_gate_reset,
 		     1 << (CONFIG_CONS_INDEX - 1));
@@ -218,43 +212,6 @@ uint clock_get_apb1(void)
 
 	return clock;
 }
-
-uint clock_get_apb2(void)
-{
-	struct sunxi_ccm_reg *const ccm =
-		(struct sunxi_ccm_reg *)SUNXI_CCM_BASE;
-	unsigned int reg_val = 0;
-	int clock = 0, factor_m = 0, factor_n = 0;
-	int src = 0, src_clock = 0;
-
-	reg_val = readl(&ccm->apb2_cfg);
-	src = (reg_val >> 24)&0x3;
-	factor_m  = ((reg_val >> 0) & 0x03) + 1;
-	factor_n  = ((reg_val >> 8) & 0x03) + 1;
-
-	switch (src) {
-	case 0://OSC24M
-		src_clock = 24;
-		break;
-	case 1://CCMU_32K
-		src_clock = 32/1000;
-		break;
-	case 2:	//PSI
-		src_clock = clock_get_ahb();
-		break;
-	case 3:	//PSI
-		src_clock = clock_get_pll6();
-		break;
-	default:
-			return 0;
-	}
-
-	clock = src_clock/factor_m/factor_n;
-
-	return clock;
-
-}
-
 
 uint clock_get_mbus(void)
 {

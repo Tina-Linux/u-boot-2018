@@ -41,6 +41,10 @@
 #include <asm/arch/sid_sun8iw21.h>
 #elif defined(CONFIG_MACH_SUN50IW5)
 #include <asm/arch/sid_sun50iw5.h>
+#elif defined(CONFIG_MACH_SUN8IW11)
+#include <asm/arch/sid_sun8iw11.h>
+#elif defined(CONFIG_MACH_SUN55IW3)
+#include <asm/arch/sid_sun55iw3.h>
 #else
 #error "platform not support"
 #endif
@@ -54,6 +58,7 @@ int sid_probe_security_mode(void);
 int sid_set_security_mode(void);
 int  sid_get_security_status(void);
 int sunxi_efuse_get_soc_ver(void);
+int sunxi_efuse_verify_rotpk(u8 *hash);
 #endif
 
 #endif /* _SUNXI_SID_H */

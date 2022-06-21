@@ -56,6 +56,15 @@ int bmu_set_power_off(void)
 	return -1;
 }
 
+/*Set ntc onoff*/
+int bmu_set_ntc_onoff(int onoff)
+{
+	if ((sunxi_bmu_dev) && (sunxi_bmu_dev->set_ntc_onoff))
+		return sunxi_bmu_dev->set_ntc_onoff(onoff);
+	axp_err("not imple:%s\n", __func__);
+	return -1;
+}
+
 /* Get the reason for triggering the boot, (button to power on, power on)*/
 int bmu_get_poweron_source(void)
 {

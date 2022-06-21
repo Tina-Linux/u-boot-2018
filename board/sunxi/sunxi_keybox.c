@@ -145,6 +145,7 @@ static int try_reencrypt_and_install(const char *name, int replace)
 	}
 }
 
+#define INSTALL_SUCCESS_AFTER_REENC 1
 static int default_keybox_installation(const char *name)
 {
 	sunxi_secure_storage_info_t secure_object;
@@ -165,6 +166,9 @@ static int default_keybox_installation(const char *name)
 		if (strcmp(name, secure_object.name) != 0) {
 			pr_msg("try reencrypt and install key %s\n", name);
 			ret = try_reencrypt_and_install(name, 1);
+			if (!ret) {
+				return INSTALL_SUCCESS_AFTER_REENC;
+			}
 		}
 		return -1;
 	}
@@ -177,6 +181,7 @@ static int sunxi_keybox_install_keys(void)
 	int ret;
 	struct sunxi_key_t *start =
 		ll_entry_start(struct sunxi_key_t, sunxi_keys);
+	int flush_required = 0;
 
 	if (key_list_inited == 0)
 		return -1;
@@ -193,7 +198,10 @@ static int sunxi_keybox_install_keys(void)
 		pr_msg("load key %s with default cb\n", key_list[i]);
 		/* deafult behavior */
 		ret = default_keybox_installation(key_list[i]);
-		if (ret) {
+		if (ret == INSTALL_SUCCESS_AFTER_REENC) {
+			/* reencrypt include a writing, need flush afterward */
+			flush_required = 1;
+		} else if (ret) {
 			continue;
 		}
 
@@ -207,6 +215,9 @@ static int sunxi_keybox_install_keys(void)
 			}
 		}
 #endif
+	}
+	if (flush_required) {
+		sunxi_secstorage_flush();
 	}
 	return 0;
 }

@@ -14,13 +14,14 @@
 #include <linux/string.h>
 #include "rawnand_base.h"
 #include "../nand_boot.h"
-#include "../nand_errno.h"
+#include <sunxi_nand_errno.h>
 #include "../nand_physic_interface.h"
 #include "../nand_secure_storage.h"
 #include "controller/ndfc_base.h"
 #include "controller/ndfc_ops.h"
 #include "controller/ndfc_timings.h"
-#include "rawnand.h"
+/*#include "rawnand.h"*/
+#include <sunxi_nand.h>
 #include "rawnand_boot.h"
 #include "rawnand_cfg.h"
 #include "rawnand_debug.h"
@@ -28,6 +29,7 @@
 #include "../version.h"
 #include "../../nand_osal_uboot.h"
 #include <asm/io.h>
+#include <sunxi_nand_boot.h>
 
 
 extern int nand_open_count;
@@ -39,6 +41,11 @@ struct _nand_permanent_data nand_permanent_data = {
     0,
 };
 
+
+extern int is_phyinfo_empty(struct _boot_info *info);
+extern int nand_physic_info_read(void);
+
+extern struct _boot_info *phyinfo_buf;
 
 /*
  *Name         :
@@ -1470,7 +1477,7 @@ static int rawnand_channel_init_tail(void)
 	/*rawnand some special init. eg. chip special request of readretry*/
 	rawnand_special_init();
 
-	nand_physic_info_read();
+	/*nand_physic_info_read();*/
 
 	/*build the super chips*/
 	if (rawnand_sp_chips_init((struct nand_super_chip_info *)&g_nssi->nsci) != NAND_OP_TRUE) {
@@ -1560,6 +1567,19 @@ err0:
 	delete_nctri();
 	return NAND_OP_FALSE ;
 }
+void dump_factory_bad_blocks( _FACTORY_BLOCK *factory_bad_block, int len)
+{
+	int i = 0;
+
+	struct _nand_super_block *p = (struct _nand_super_block *)factory_bad_block->data;
+	for (i = 0; i < len; i+=8) {
+		printf("[%d-%d] [%d-%d] [%d-%d] [%d-%d] [%d-%d] [%d-%d] [%d-%d] [%d-%d]\n",
+				p[i].Chip_NO, p[i].Block_NO, p[i + 1].Chip_NO, p[i + 1].Block_NO,
+				p[i + 2].Chip_NO, p[i + 2].Block_NO, p[i + 3].Chip_NO, p[i + 3].Block_NO,
+				p[i + 4].Chip_NO, p[i + 4].Block_NO, p[i + 5].Chip_NO, p[i + 5].Block_NO,
+				p[i + 6].Chip_NO, p[i + 6].Block_NO, p[i + 7].Chip_NO, p[i + 7].Block_NO);
+	}
+}
 void rawnand_set_nand_info_data(struct _nand_info *nand_info)
 {
 	nand_info->type = 0;
@@ -1589,6 +1609,7 @@ void rawnand_set_nand_info_data(struct _nand_info *nand_info)
 	 *    aw_nand_info.boot->uboot_next_block*/
 	set_uboot_start_and_end_block();
 }
+
 #if defined(CONFIG_SUNXI_NAND_ERASE_ALL_BLOCK)
 void rawnand_erase_all_block(struct _nand_info *nand_info)
 {
@@ -1636,7 +1657,7 @@ struct _nand_info *RawNandHwInit(void)
 		return NULL;
 	}
 
-	rawnand_set_nand_info_data(&aw_nand_info);
+	/*rawnand_set_nand_info_data(&aw_nand_info);*/
 
 	set_hynix_special_info();
 

@@ -50,6 +50,16 @@
 #define CCMU_GMAC_CLK_REG       0x097c
 #define CCMU_GMAC_RST_BIT       16
 #define CCMU_GMAC_GATING_BIT    0
+#elif defined(CONFIG_MACH_SUN50IW10)
+#define IOBASE			0x05020000
+#define PHY_CLK_REG		(0x03000000 + 0x30)
+#define CCMU_BASE		0x03001000
+#define CCMU_GMAC_CLK_REG	0x097c
+#define CCMU_GMAC_RST_BIT	16
+#define CCMU_GMAC_GATING_BIT	0
+#define CCMU_EPHY_CLK_REG	0x0970
+#define CCMU_EPHY_GATING_BIT	31
+#define CONFIG_SUNXI_EXT_PHY
 #elif defined(CONFIG_SUN8IW12P1) || defined(CONFIG_SUN8IW12P1_NOR)
 #define IOBASE                  0x05020000
 #define PHY_CLK_REG             (0x03000000 + 0x30)
@@ -342,11 +352,11 @@ static u16 geth_phy_read(struct eth_device *dev, int phy_adr, u16 reg)
 					((reg << 4) & (0x000007F0)) |
 					MII_BUSY);
 
-	writel(reg_val, (void *)(dev->iobase + GETH_MDIO_ADDR));
-	while (readl((void *)(dev->iobase + GETH_MDIO_ADDR)) & MII_BUSY)
+	writel(reg_val, (void *)(unsigned long)(dev->iobase + GETH_MDIO_ADDR));
+	while (readl((void *)(unsigned long)(dev->iobase + GETH_MDIO_ADDR)) & MII_BUSY)
 		;
 
-	return  readl((void *)(dev->iobase + GETH_MDIO_DATA));
+	return  readl((void *)(unsigned long)(dev->iobase + GETH_MDIO_DATA));
 }
 
 static void geth_phy_write(struct eth_device *dev, u8 phy_adr, u8 reg, u16 data)
@@ -358,11 +368,11 @@ static void geth_phy_write(struct eth_device *dev, u8 phy_adr, u8 reg, u16 data)
 					((reg << 4) & (0x000007F0)) |
 					MII_WRITE | MII_BUSY);
 
-	writel(data, (void *)(dev->iobase + GETH_MDIO_DATA));
-	writel(reg_val, (void *)(dev->iobase + GETH_MDIO_ADDR));
+	writel(data, (void *)(unsigned long)(dev->iobase + GETH_MDIO_DATA));
+	writel(reg_val, (void *)(unsigned long)(dev->iobase + GETH_MDIO_ADDR));
 
 	/* Until operation is complete and exiting */
-	while (readl((void *)(dev->iobase + GETH_MDIO_ADDR)) & MII_BUSY)
+	while (readl((void *)(unsigned long)(dev->iobase + GETH_MDIO_ADDR)) & MII_BUSY)
 		;
 }
 
@@ -408,13 +418,13 @@ int geth_miiphy_write(const char *devname, u8 phy_adr, u8 reg, u16 data)
 static void dma_tx_enable(struct eth_device *dev, bool en)
 {
 	u32 reg_val;
-	reg_val = readl((void *)(dev->iobase + GETH_TX_CTL1));
+	reg_val = readl((void *)(unsigned long)(dev->iobase + GETH_TX_CTL1));
 	if (en)
 		reg_val |= 0x40000000;
 	else
 		reg_val &= ~0x40000000;
 
-	writel(reg_val, (void *)(dev->iobase + GETH_TX_CTL1));
+	writel(reg_val, (void *)(unsigned long)(dev->iobase + GETH_TX_CTL1));
 }
 #endif
 static int geth_xmit(struct eth_device *dev, void *packet, int length)
@@ -424,7 +434,7 @@ static int geth_xmit(struct eth_device *dev, void *packet, int length)
 	int tmo;
 
 	/* Get transmit status */
-	xmit_stat = readl((void *)(dev->iobase + GETH_TX_DMA_STA)) & 0x7;
+	xmit_stat = readl((void *)(unsigned long)(dev->iobase + GETH_TX_DMA_STA)) & 0x7;
 
 	/* Wait the Prev packet compled and timeout flush it */
 	tmo = get_timer(0) + 5 * CONFIG_SYS_HZ;
@@ -436,9 +446,9 @@ static int geth_xmit(struct eth_device *dev, void *packet, int length)
 #ifdef RESET_DMA_EN
 	dma_tx_enable(dev, false);
 	/* clear the tx interrupt */
-	reg_val = readl((void *)(dev->iobase + GETH_INT_STA));
+	reg_val = readl((void *)(unsigned long)(dev->iobase + GETH_INT_STA));
 	reg_val |= 0x3F;
-	writel(reg_val, (void *)(dev->iobase + GETH_INT_STA));
+	writel(reg_val, (void *)(unsigned long)(dev->iobase + GETH_INT_STA));
 #endif
 	/* configure transmit dma descriptor */
 	tx_p->desc0.all = 0x80000000;   /* Set Own */
@@ -454,22 +464,22 @@ static int geth_xmit(struct eth_device *dev, void *packet, int length)
 #endif
 	flush_cache((unsigned long)packet, length);
 	/* flush Transmit FIFO */
-	reg_val = readl((void *)(dev->iobase + GETH_TX_CTL1));
+	reg_val = readl((void *)(unsigned long)(dev->iobase + GETH_TX_CTL1));
 	reg_val |= 0x00000001;
-	writel(reg_val, (void *)(dev->iobase + GETH_TX_CTL1));
+	writel(reg_val, (void *)(unsigned long)(dev->iobase + GETH_TX_CTL1));
 
 	pkt_hex_dump("TX", (void *)packet, 64);
 #ifdef RESET_DMA_EN
-	writel((ulong)tx_p, (void *)(dev->iobase + GETH_TX_DESC_LIST));
+	writel((ulong)tx_p, (void *)(unsigned long)(dev->iobase + GETH_TX_DESC_LIST));
 	dma_tx_enable(dev, true);
 #else
 	/* Enable transmit and Poll transmit */
-	reg_val = readl((void *)(dev->iobase + GETH_TX_CTL1));
+	reg_val = readl((void *)(unsigned long)(dev->iobase + GETH_TX_CTL1));
 	if (xmit_stat == 0x00)
 		reg_val |= 0x40000000;
 	else
 		reg_val |= 0x80000000;
-	writel(reg_val, (void *)(dev->iobase + GETH_TX_CTL1));
+	writel(reg_val, (void *)(unsigned long)(dev->iobase + GETH_TX_CTL1));
 #endif
 	return 0;
 }
@@ -500,13 +510,13 @@ static int rx_status(dma_desc_t *p)
 static void dma_rx_enable(struct eth_device *dev, bool en)
 {
 	u32 reg_val;
-	reg_val = readl((void *)(dev->iobase + GETH_RX_CTL1));
+	reg_val = readl((void *)(unsigned long)(dev->iobase + GETH_RX_CTL1));
 	if (en)
 		reg_val |= 0x40000000;
 	else
 		reg_val &= ~0x40000000;
 
-	writel(reg_val, (void *)(dev->iobase + GETH_RX_CTL1));
+	writel(reg_val, (void *)(unsigned long)(dev->iobase + GETH_RX_CTL1));
 }
 #endif
 static int geth_recv(struct eth_device *dev)
@@ -530,14 +540,14 @@ static int geth_recv(struct eth_device *dev)
 	 */
 	memcpy(rx_handle_buf, rx_packet, 2048);
 
-	recv_stat = readl((void *)(dev->iobase + GETH_INT_STA));
+	recv_stat = readl((void *)(unsigned long)(dev->iobase + GETH_INT_STA));
 	if (!(recv_stat & 0x2300))
 		goto fill;
 
 #ifdef RESET_DMA_EN
 	dma_rx_enable(dev, false);
 #endif
-	writel(0x3F00, (void *)(dev->iobase + GETH_INT_STA));
+	writel(0x3F00, (void *)(unsigned long)(dev->iobase + GETH_INT_STA));
 
 	recv_stat = rx_status(rx_p);
 	if (recv_stat != discard_frame) {
@@ -568,18 +578,18 @@ fill:
 #endif
 
 #ifdef RESET_DMA_EN
-	writel((ulong)rx_p, (void *)(dev->iobase + GETH_RX_DESC_LIST));
+	writel((ulong)rx_p, (void *)(unsigned long)(dev->iobase + GETH_RX_DESC_LIST));
 	dma_rx_enable(dev, true);
 #else
 	u32 reg_val;
-	recv_stat = readl((void *)(dev->iobase + GETH_RX_DMA_STA)) & 0x07;
+	recv_stat = readl((void *)(unsigned long)(dev->iobase + GETH_RX_DMA_STA)) & 0x07;
 	/* Enable receive and poll it */
-	reg_val = readl((void *)(dev->iobase + GETH_RX_CTL1));
+	reg_val = readl((void *)(unsigned long)(dev->iobase + GETH_RX_CTL1));
 	if (recv_stat == 0x00)
 		reg_val |= 0x40000000;
 	else
 		reg_val |= 0x80000000;
-	writel(reg_val, (void *)(dev->iobase + GETH_RX_CTL1));
+	writel(reg_val, (void *)(unsigned long)(dev->iobase + GETH_RX_CTL1));
 #endif
 
 	return 0;
@@ -604,15 +614,15 @@ static int geth_sys_init(void)
 #endif
 
 	/* Enable clk for ephy */
-	value = readl((void *)PHY_CLK_REG);
+	value = readl((void *)(unsigned long)PHY_CLK_REG);
 	if (used_type == INT_PHY) {
-		reg_val = readl((void *)(CCMU_BASE + 0x0070));
+		reg_val = readl((void *)(unsigned long)(CCMU_BASE + 0x0070));
 		reg_val |= (1 << 0);
-		writel(reg_val, (void *)(CCMU_BASE + 0x0070));
+		writel(reg_val, (void *)(unsigned long)(CCMU_BASE + 0x0070));
 
-		reg_val = readl((void *)(CCMU_BASE + 0x02c8));
+		reg_val = readl((void *)(unsigned long)(CCMU_BASE + 0x02c8));
 		reg_val |= (1 << 2);
-		writel(reg_val, (void *)(CCMU_BASE + 0x02c8));
+		writel(reg_val, (void *)(unsigned long)(CCMU_BASE + 0x02c8));
 
 		value |= (1 << 15);
 		value &= ~(1 << 16);
@@ -686,39 +696,41 @@ static int geth_sys_init(void)
 	value &= ~(0x1f << 5);
 	value |= ((rx_delay & 0x1f) << 5);
 
-	writel(value, (void *)PHY_CLK_REG);
+	writel(value, (void *)(unsigned long)PHY_CLK_REG);
 
 	/* enable clk for gmac */
 #if defined(CONFIG_SUN50IW6P1) || defined(CONFIG_SUN8IW12P1) \
     || defined(CONFIG_SUN8IW12P1_NOR) || defined(CONFIG_MACH_SUN50IW9) \
     || defined(CONFIG_MACH_SUN8IW19) \
-    || defined(CONFIG_MACH_SUN8IW20) || defined(CONFIG_MACH_SUN20IW1)
-	reg_val = readl((void *)(CCMU_BASE + CCMU_GMAC_CLK_REG));
+    || defined(CONFIG_MACH_SUN8IW20) || defined(CONFIG_MACH_SUN20IW1) \
+    || defined(CONFIG_MACH_SUN50IW10)
+	reg_val = readl((void *)(unsigned long)(CCMU_BASE + CCMU_GMAC_CLK_REG));
 	reg_val |= (1 << CCMU_GMAC_RST_BIT);   /* Reset Deassert */
 	reg_val |= (1 << CCMU_GMAC_GATING_BIT);
-	writel(reg_val, (void *)(CCMU_BASE + CCMU_GMAC_CLK_REG));
+	writel(reg_val, (void *)(unsigned long)(CCMU_BASE + CCMU_GMAC_CLK_REG));
 #else
-	reg_val = readl((void *)(CCMU_BASE + AHB1_GATING));
+	reg_val = readl((void *)(unsigned long)(CCMU_BASE + AHB1_GATING));
 	reg_val |= AHB1_GATING_BIT;
-	writel(reg_val, (void *)(CCMU_BASE + AHB1_GATING));
+	writel(reg_val, (void *)(unsigned long)(CCMU_BASE + AHB1_GATING));
 
-	reg_val = readl((void *)(CCMU_BASE + AHB1_RESET));
+	reg_val = readl((void *)(unsigned long)(CCMU_BASE + AHB1_RESET));
 	reg_val |= AHB1_RESET_BIT;
-	writel(reg_val, (void *)(CCMU_BASE + AHB1_RESET));
+	writel(reg_val, (void *)(unsigned long)(CCMU_BASE + AHB1_RESET));
 #endif
 
 	/* enable ephy clk */
 	if (use_ephy_clk == 1) {
 		printf("gmac: *** using ephy_clk ***\n");
-		reg_val = readl((void *)(CCMU_BASE + CCMU_EPHY_CLK_REG));
+		reg_val = readl((void *)(unsigned long)(CCMU_BASE + CCMU_EPHY_CLK_REG));
 #if defined(CONFIG_MACH_SUN50IW9) || defined(CONFIG_MACH_SUN8IW19) || \
-    defined(CONFIG_MACH_SUN8IW20) || defined(CONFIG_MACH_SUN20IW1)
+    defined(CONFIG_MACH_SUN8IW20) || defined(CONFIG_MACH_SUN20IW1) || \
+    defined(CONFIG_MACH_SUN50IW10)
 		/* set CCMU_EPHY_CLK_REG's bit30 and bit31 to 1 */
 		reg_val |= (3 << (CCMU_EPHY_GATING_BIT - 1));
 #else
 		reg_val |= (1 << CCMU_EPHY_GATING_BIT);
 #endif
-		writel(reg_val, (void *)(CCMU_BASE + CCMU_EPHY_CLK_REG));
+		writel(reg_val, (void *)(unsigned long)(CCMU_BASE + CCMU_EPHY_CLK_REG));
 	}
 
 	return 0;
@@ -871,7 +883,7 @@ static int mii_phy_init(struct eth_device *dev)
 #endif
 #endif /* PHY_RTL8211F */
 	phy_val = geth_phy_read(dev, phy_addr, MII_BMCR);
-	reg_val = readl((void *)(dev->iobase + GETH_BASIC_CTL0));
+	reg_val = readl((void *)(unsigned long)(dev->iobase + GETH_BASIC_CTL0));
 	if (phy_val & BMCR_FULLDPLX)
 		reg_val |= 0x01;
 	else
@@ -883,7 +895,7 @@ static int mii_phy_init(struct eth_device *dev)
 		reg_val |= 0x0c;
 	else if (!(phy_val & BMCR_SPEED1000))
 		reg_val |= 0x08;
-	writel(reg_val, (void *)(dev->iobase + GETH_BASIC_CTL0));
+	writel(reg_val, (void *)(unsigned long)(dev->iobase + GETH_BASIC_CTL0));
 
 #if 0
 	/* just for debug loopback */
@@ -894,9 +906,9 @@ static int mii_phy_init(struct eth_device *dev)
 	printf("REG0: %08x\n", phy_val);
 
 	/* MAC layer Loopback */
-	reg_val = readl((void *)(dev->iobase + GETH_BASIC_CTL0));
+	reg_val = readl((dev->iobase + GETH_BASIC_CTL0));
 	reg_val |= 0x02;
-	writel(reg_val, (void *)(dev->iobase + GETH_BASIC_CTL0));
+	writel(reg_val, (dev->iobase + GETH_BASIC_CTL0));
 #endif
 
 #if defined(CONFIG_SUN50IW6P1)
@@ -921,52 +933,52 @@ static int geth_init(struct eth_device *dev, bd_t *bis)
 
 	/* Reset all components */
 
-	reg_val = readl((void *)(dev->iobase + GETH_BASIC_CTL1));
+	reg_val = readl((void *)(unsigned long)(dev->iobase + GETH_BASIC_CTL1));
 	reg_val |= 0x01;
-	writel(reg_val, (void *)(dev->iobase + GETH_BASIC_CTL1));
-	while (readl((void *)(dev->iobase + GETH_BASIC_CTL1)) & (0x01))
+	writel(reg_val, (void *)(unsigned long)(dev->iobase + GETH_BASIC_CTL1));
+	while (readl((void *)(unsigned long)(dev->iobase + GETH_BASIC_CTL1)) & (0x01))
 		;
 
 	/* init phy */
 	mii_phy_init(dev);
 
 	/* Initialize core */
-	reg_val = readl((void *)(dev->iobase + GETH_TX_CTL0));
+	reg_val = readl((void *)(unsigned long)(dev->iobase + GETH_TX_CTL0));
 	reg_val |= (3 << 30);   /* Enable transmit component &  Jabber Disable */
-	writel(reg_val, (void *)(dev->iobase + GETH_TX_CTL0));
+	writel(reg_val, (void *)(unsigned long)(dev->iobase + GETH_TX_CTL0));
 
-	reg_val = readl((void *)(dev->iobase + GETH_TX_CTL1));
+	reg_val = readl((void *)(unsigned long)(dev->iobase + GETH_TX_CTL1));
 	/* Transmit COE type 2 cannot be done in cut-through mode. */
 	reg_val |= 0x02;
-	writel(reg_val, (void *)(dev->iobase + GETH_TX_CTL1));
+	writel(reg_val, (void *)(unsigned long)(dev->iobase + GETH_TX_CTL1));
 
-	reg_val = readl((void *)(dev->iobase + GETH_RX_CTL0));
+	reg_val = readl((void *)(unsigned long)(dev->iobase + GETH_RX_CTL0));
 #ifdef CONFIG_HARD_CHECKSUM
 	reg_val |= (1 << 27);                           /* Enable CRC & IPv4 Header Checksum */
 #endif
 	reg_val |= (0x0F << 28);                        /* Automatic Pad/CRC Stripping */
-	writel(reg_val, (void *)(dev->iobase + GETH_RX_CTL0));
+	writel(reg_val, (void *)(unsigned long)(dev->iobase + GETH_RX_CTL0));
 
-	reg_val = readl((void *)(dev->iobase + GETH_RX_CTL1));
+	reg_val = readl((void *)(unsigned long)(dev->iobase + GETH_RX_CTL1));
 	reg_val |= 0x02;
-	writel(reg_val, (void *)(dev->iobase + GETH_RX_CTL1));
+	writel(reg_val, (void *)(unsigned long)(dev->iobase + GETH_RX_CTL1));
 
 	/* GMAC frame filter */
-	reg_val = readl((void *)(dev->iobase + GETH_RX_FRM_FLT));
+	reg_val = readl((void *)(unsigned long)(dev->iobase + GETH_RX_FRM_FLT));
 	reg_val |= 0x00000001;
-	writel(reg_val, (void *)(dev->iobase + GETH_RX_FRM_FLT));
+	writel(reg_val, (void *)(unsigned long)(dev->iobase + GETH_RX_FRM_FLT));
 
 	/* Burst should be 8 */
-	reg_val = readl((void *)(dev->iobase + GETH_BASIC_CTL1));
+	reg_val = readl((void *)(unsigned long)(dev->iobase + GETH_BASIC_CTL1));
 	reg_val |= (8 << 24);
-	writel(reg_val, (void *)(dev->iobase + GETH_BASIC_CTL1));
+	writel(reg_val, (void *)(unsigned long)(dev->iobase + GETH_BASIC_CTL1));
 
 	/* Seth hardware address */
 	if (dev->write_hwaddr)
 		dev->write_hwaddr(dev);
 
 	/* Disable all interrupt of dma */
-	writel(0x00UL, (void *)(dev->iobase + GETH_INT_EN));
+	writel(0x00UL, (void *)(unsigned long)(dev->iobase + GETH_INT_EN));
 
 	memset((void *)dma_desc_tx, 0, sizeof(dma_desc_t));
 	memset((void *)dma_desc_rx, 0, sizeof(dma_desc_t));
@@ -979,8 +991,8 @@ static int geth_init(struct eth_device *dev, bd_t *bis)
 	flush_cache((unsigned long)dma_desc_rx, ALIGN(sizeof(*dma_desc_rx), CACHE_LINE_SIZE));
 #endif
 
-	writel((ulong)dma_desc_tx, (void *)(dev->iobase + GETH_TX_DESC_LIST));
-	writel((ulong)dma_desc_rx, (void *)(dev->iobase + GETH_RX_DESC_LIST));
+	writel((ulong)dma_desc_tx, (void *)(unsigned long)(dev->iobase + GETH_TX_DESC_LIST));
+	writel((ulong)dma_desc_rx, (void *)(unsigned long)(dev->iobase + GETH_RX_DESC_LIST));
 
 	return 0;
 }
@@ -990,14 +1002,14 @@ static void geth_halt(struct eth_device *dev)
 	int reg_val;
 
 	/* Disable transmit component */
-	reg_val = readl((void *)(dev->iobase + GETH_TX_CTL0));
+	reg_val = readl((void *)(unsigned long)(dev->iobase + GETH_TX_CTL0));
 	reg_val &= ~0x80000000;
-	writel(reg_val, (void *)(dev->iobase + GETH_TX_CTL0));
+	writel(reg_val, (void *)(unsigned long)(dev->iobase + GETH_TX_CTL0));
 
 	/* Disable received component */
-	reg_val = readl((void *)(dev->iobase + GETH_RX_CTL0));
+	reg_val = readl((void *)(unsigned long)(dev->iobase + GETH_RX_CTL0));
 	reg_val &= ~0x80000000;
-	writel(reg_val, (void *)(dev->iobase + GETH_RX_CTL0));
+	writel(reg_val, (void *)(unsigned long)(dev->iobase + GETH_RX_CTL0));
 }
 
 int geth_write_hwaddr(struct eth_device *dev)
@@ -1007,10 +1019,10 @@ int geth_write_hwaddr(struct eth_device *dev)
 
 	addr = &(dev->enetaddr[0]);
 	mac  = (addr[5] << 8) | addr[4];
-	writel(mac, (void *)(dev->iobase + GETH_ADDR_HI(0)));
+	writel(mac, (void *)(unsigned long)(dev->iobase + GETH_ADDR_HI(0)));
 
 	mac  = (addr[3] << 24) | (addr[2] << 16) | (addr[1] << 8) | addr[0];
-	writel(mac, (void *)(dev->iobase + GETH_ADDR_LO(0)));
+	writel(mac, (void *)(unsigned long)(dev->iobase + GETH_ADDR_LO(0)));
 
 	return 0;
 }

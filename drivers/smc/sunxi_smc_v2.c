@@ -45,6 +45,7 @@ DECLARE_GLOBAL_DATA_PTR;
 #define ARM_SVC_ARISC_WRITE_PMU                 0x8000ff13
 #define ARM_SVC_ARISC_FAKE_POWER_OFF_REQ_ARCH32 0x83000019
 #define ARM_SVC_FAKE_POWER_OFF       0x8000ff14
+#define ARM_SVC_UBOOT_POWER_OFF       0x8000ff15
 
 /* efuse */
 #define ARM_SVC_EFUSE_READ         (0x8000fe00)
@@ -168,6 +169,11 @@ int arm_svc_arisc_fake_poweroff(void)
 int arm_svc_fake_poweroff(ulong dtb_base)
 {
 	return sunxi_smc_call(ARM_SVC_FAKE_POWER_OFF, dtb_base, 0, 0, 0);
+}
+
+int arm_svc_poweroff(void)
+{
+	return sunxi_smc_call(ARM_SVC_UBOOT_POWER_OFF, 0, 0, 0, 0);
 }
 
 u32 arm_svc_arisc_read_pmu(ulong addr)
@@ -646,7 +652,7 @@ int smc_tee_inform_fdt(uint64_t base, uint32_t size)
 	arm_smccc_smc(OPTEE_SMC_SUNXI_INFORM_FDT, base, 0, size, 0, 0, 0, 0,
 		      &param);
 	if (param.a0 != 0) {
-		pr_msg("%s failed with: %ld", __func__, param.a0);
+		pr_err("%s failed with: %ld", __func__, param.a0);
 		return param.a0;
 	}
 	return 0;

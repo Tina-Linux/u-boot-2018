@@ -1001,6 +1001,7 @@ static int sunxi_individual_lock_global(struct spi_nor *nor)
 
 	switch (JEDEC_MFR(nor->info)) {
 	case SNOR_MFR_WINBOND:
+	case SNOR_MFR_PUYA:
 	case SNOR_MFR_FM:
 	case SNOR_MFR_XTX:
 		return nor->write_reg(nor, SPINOR_OP_GBLK, NULL, 0);
@@ -1018,6 +1019,7 @@ static int sunxi_individual_unlock_global(struct spi_nor *nor)
 
 	switch (JEDEC_MFR(nor->info)) {
 	case SNOR_MFR_WINBOND:
+	case SNOR_MFR_PUYA:
 	case SNOR_MFR_FM:
 	case SNOR_MFR_XTX:
 		return nor->write_reg(nor, SPINOR_OP_UGBLK, NULL, 0);
@@ -1048,6 +1050,7 @@ static int sunxi_individual_handle_lock(struct spi_nor *nor,
 	write_enable(nor);
 	switch (JEDEC_MFR(nor->info)) {
 	case SNOR_MFR_WINBOND:
+	case SNOR_MFR_PUYA:
 	case SNOR_MFR_FM:
 	case SNOR_MFR_XTX:
 		while (len) {
@@ -1096,6 +1099,7 @@ static int sunxi_individual_lock_status(struct spi_nor *nor,
 	write_enable(nor);
 	switch (JEDEC_MFR(nor->info)) {
 	case SNOR_MFR_WINBOND:
+	case SNOR_MFR_PUYA:
 	case SNOR_MFR_FM:
 	case SNOR_MFR_XTX:
 		while (len) {
@@ -1171,6 +1175,7 @@ static int sunxi_individual_lock_enable(struct spi_nor *nor)
 
 	switch (JEDEC_MFR(nor->info)) {
 	case SNOR_MFR_WINBOND:
+	case SNOR_MFR_PUYA:
 		status = read_sr3(nor);
 		write_sr3(nor, status | SR_WPS_EN_WINBOND);
 		if (read_sr3(nor) | SR_WPS_EN_WINBOND)
@@ -1203,6 +1208,7 @@ static int sunxi_individual_lock_is_enable(struct spi_nor *nor)
 {
 	switch (JEDEC_MFR(nor->info)) {
 	case SNOR_MFR_WINBOND:
+	case SNOR_MFR_PUYA:
 		if (read_sr3(nor) | SR_WPS_EN_WINBOND)
 			return 1;
 		else
@@ -2749,6 +2755,7 @@ static int spi_nor_init(struct spi_nor *nor)
 		nor->flash_is_locked = sunxi_individual_is_lock;
 	}
 	if (sunxi_individual_lock_is_enable(nor)) {
+		printf("individual lock is enable\n");
 		if (get_boot_work_mode() == 16)
 			sunxi_individual_unlock_global(nor);
 	}
@@ -2756,7 +2763,7 @@ static int spi_nor_init(struct spi_nor *nor)
 	if (nor->quad_enable) {
 		err = nor->quad_enable(nor);
 		if (err) {
-			dev_dbg(nor->dev, "quad mode not supported\n");
+			dev_err(nor->dev, "quad mode not supported\n");
 			return err;
 		}
 	}
@@ -2779,6 +2786,8 @@ static int spi_nor_init(struct spi_nor *nor)
 	return 0;
 }
 
+void sunxi_update_right_delay_para(struct mtd_info *mtd);
+int sunxi_set_right_delay_para(struct mtd_info *mtd);
 int spi_nor_scan(struct spi_nor *nor)
 {
 	struct spi_nor_flash_parameter params;
@@ -2802,7 +2811,6 @@ int spi_nor_scan(struct spi_nor *nor)
 	nor->write_reg = spi_nor_write_reg;
 
 	info = spi_nor_read_id(nor);
-	spi_init_clk(spi);
 
 	if (spi->mode & SPI_RX_QUAD && info->flags & SPI_NOR_QUAD_READ) {
 			hwcaps.mask |= SNOR_HWCAPS_READ_1_1_4;
@@ -2923,6 +2931,16 @@ int spi_nor_scan(struct spi_nor *nor)
 	nor->size = mtd->size;
 	nor->erase_size = mtd->erasesize;
 	nor->sector_size = mtd->erasesize;
+
+#ifdef CONFIG_SPI_SAMP_DL_EN
+	if (get_boot_work_mode() == 16)
+		sunxi_update_right_delay_para(mtd);
+	else {
+		sunxi_set_right_delay_para(mtd);
+	}
+#else
+	spi_init_clk(spi);
+#endif
 
 #ifndef CONFIG_SPL_BUILD
 	printf("SF: Detected %s with page size ", nor->name);

@@ -37,3 +37,5 @@ obj-$(CONFIG_SUNXI_LRADC_VOL)	+= sunxi_lradc_vol.o
 obj-$(CONFIG_SUNXI_MIPS) += sunxi_mips.o
 
 obj-$(CONFIG_SUNXI_IMAGE_HEADER) += sunxi_image_header.o
+
+obj-y += sunxi_challenge.o

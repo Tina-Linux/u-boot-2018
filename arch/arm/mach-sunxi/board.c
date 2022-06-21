@@ -103,6 +103,10 @@ void reset_cpu(ulong addr)
 {
 #if defined(CONFIG_SUNXI_WDT_V2)
 	static const struct sunxi_wdog *wdog = (struct sunxi_wdog *)SUNXI_WDT_BASE;
+#if defined(CONFIG_MACH_SUN50IW12)
+	/*wait deinit done, so we wont freeze on reboot*/
+	mdelay(500);
+#endif
 	/* Set the watchdog for its shortest interval (.5s) and wait */
 	writel(((WDT_CFG_KEY << 16) | WDT_MODE_EN), &wdog->srst);
 	while (1) { }

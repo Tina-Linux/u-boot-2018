@@ -27,6 +27,7 @@
 #include <mmc.h>
 #include <linux/mtd/aw-spinand.h>
 #include <boot_gui.h>
+#include "../../drivers/spi/spi-sunxi.h"
 
 DECLARE_GLOBAL_DATA_PTR;
 
@@ -719,21 +720,26 @@ int sunxi_update_fdt_para_for_kernel(void)
 		break;
 	case STORAGE_EMMC:
 		fdt_enable_node("mmc2", 1);
+		fdt_enable_node("sunxi_mmc2", 1);
 		break;
 	case STORAGE_EMMC0:
 		fdt_enable_node("mmc0", 1);
+		fdt_enable_node("sunxi_mmc0", 1);
 		break;
 	case STORAGE_EMMC3:
 		fdt_enable_node("mmc3", 1);
+		fdt_enable_node("sunxi_mmc3", 1);
 		break;
 	case STORAGE_SD:
 		fdt_enable_node("mmc0", 1);
+		fdt_enable_node("sunxi_mmc0", 1);
 		{
 			uint32_t dragonboard_test = 0;
 			script_parser_fetch("/soc/target", "dragonboard_test",
 						(int *)&dragonboard_test, 0);
 			if (dragonboard_test == 1) {
 				fdt_enable_node("mmc2", 1);
+				fdt_enable_node("sunxi_mmc2", 1);
 #ifdef CONFIG_SUNXI_SDMMC
 				mmc_update_config_for_dragonboard(2);
 #ifdef CONFIG_MMC3_SUPPORT
@@ -786,7 +792,11 @@ int sunxi_update_fdt_para_for_kernel(void)
 	}
 #endif
 #ifdef CONFIG_SPI_SAMP_DL_EN
-	struct aw_spinand *spinand = get_spinand();
+#ifdef CONFIG_SUNXI_SPINOR
+	struct sunxi_spi_slave *info = get_sspi();
+#else
+	struct aw_spinand *info = get_spinand();
+#endif
 	int nodeoffset = 0;
 	nodeoffset = fdt_path_offset(working_fdt, "spi0");
 	if (nodeoffset < 0) {
@@ -795,9 +805,9 @@ int sunxi_update_fdt_para_for_kernel(void)
 		return -1;
 	}
 	fdt_setprop_u32(working_fdt, nodeoffset,
-			"sample_mode", spinand->right_sample_mode);
+			"sample_mode", info->right_sample_mode);
 	fdt_setprop_u32(working_fdt, nodeoffset,
-			"sample_delay", spinand->right_sample_delay);
+			"sample_delay", info->right_sample_delay);
 #endif
 
 	/* fix dram para */

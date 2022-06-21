@@ -13,7 +13,6 @@ config SUNXI_SECURE_STORAGE
 
 config SUNXI_SPRITE_CARTOON
 	bool "Sunxi Sprite cartoon support"
-	depends on (BOOT_GUI)
 	select SUNXI_FLASH
 	help
 	  Enable support for sunxi Sprite cartoon(display)

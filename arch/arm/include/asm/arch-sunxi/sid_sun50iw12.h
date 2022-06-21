@@ -24,13 +24,13 @@
 #define SID_OP_LOCK  (0xAC)
 
 #define EFUSE_CHIPID            (0x0)
-#define EFUSE_ROTPK             (0x38)
+#define EFUSE_ROTPK             (0x70)
 /* write protect */
-#define EFUSE_WRITE_PROTECT     (0x28) /* 0x28-0x2b, 32bits */
+#define EFUSE_WRITE_PROTECT     (0x40) /* 32bits */
 /* read  protect */
-#define EFUSE_READ_PROTECT      (0x2c) /* 0x2c-0x2f, 32bits */
+#define EFUSE_READ_PROTECT      (0x44) /* 32bits */
 /* jtag security */
-#define EFUSE_LCJS              (0x30)
+#define EFUSE_LCJS              (0x48)
 
 /*efuse power ctl*/
 #define EFUSE_HV_SWITCH			(SUNXI_RTC_BASE + 0x204)

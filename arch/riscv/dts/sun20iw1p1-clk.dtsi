@@ -710,7 +710,8 @@ clocks {
 			#clock-cells = <0>;
 			compatible = "allwinner,periph-clock";
 			assigned-clocks = <&clk_mipi_host0>;
-			assigned-clock-parents = <&clk_hosc>;
+			assigned-clock-parents = <&clk_pll_periph0>;
+			assigned-clock-rates = <150000000>;
 			clock-output-names = "mipi_host0";
 		};
 

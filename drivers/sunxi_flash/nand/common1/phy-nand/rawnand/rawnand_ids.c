@@ -14,6 +14,7 @@
 #include "rawnand_debug.h"
 #include <linux/string.h>
 #include <malloc.h>
+#include <sunxi_nand_errno.h>
 
 /*cmd stay to handle*/
 struct nand_phy_op_par phy_op_para[] = {
@@ -545,6 +546,7 @@ struct sunxi_nand_flash_device raw_micron[] = {
 		.ddr_opt = NAND_VCCQ_1P8V|NAND_ONFI_TIMING_MODE|NAND_ONFI_DDR2_CFG|NAND_ONFI_IO_DRIVER_STRENGTH|NAND_TOGGLE_VENDOR_SPECIFIC_CFG,
 		.bad_block_flag_position = FIRST_PAGE,
 		.multi_plane_block_offset = 1,
+		.sharedpage_offset = 1,
 		.cmd_set_no = CMD_SET_3,
 		.selected_write_boot0_no = NAND_WRITE_BOOT0_GENERIC,
 		.selected_readretry_no = NAND_READRETRY_MICRON,
@@ -722,6 +724,7 @@ struct sunxi_nand_flash_device raw_micron[] = {
 			NAND_ONFI_TIMING_MODE | NAND_VCCQ_1P8V,
 		.bad_block_flag_position = FIRST_PAGE,
 		.multi_plane_block_offset = 1,
+		.sharedpage_offset = 1,
 		.cmd_set_no = CMD_SET_3,
 		.selected_write_boot0_no = NAND_WRITE_BOOT0_GENERIC,
 		.selected_readretry_no = NAND_READRETRY_MICRON,
@@ -924,6 +927,36 @@ struct sunxi_nand_flash_device raw_micron[] = {
 		.max_blk_erase_times = 10000,
 		.access_high_freq = 30,
 	},
+	{
+		.name = "FBML05B128G1KDBABJ4",
+		.id = {0x2c, 0x84, 0x44, 0x34, 0xAA, 0xff, 0xff, 0xff},
+		.die_cnt_per_chip = 1,
+		.sect_cnt_per_page = 32,
+		.page_cnt_per_blk = 512,
+		.blk_cnt_per_die = 2192,
+		/*
+		 * This nand request that it should write lsb/msb shared pages together,
+		 * so use GENERIC_LSB_PAGE to write boot0 data both to lsb and msb pages
+		 * and use NAND_PAIRED_PAGE_SYNC for driver to write lsb,msb pages together
+		 */
+		.operation_opt = NAND_RANDOM | NAND_READ_RETRY | NAND_READ_UNIQUE_ID | NAND_PAGE_ADR_NO_SKIP | NAND_PAIRED_PAGE_SYNC |NAND_ONFI_SYNC_RESET_OP | GENERIC_LSB_PAGE,
+		.valid_blk_ratio = VALID_BLK_RATIO_DEFAULT,
+		.access_freq = 75,
+		.ecc_mode = BCH_76,
+		.read_retry_type = 0x421201,
+		.ddr_type = ONFI_DDR,
+		.ddr_opt = NAND_VCCQ_1P8V|NAND_ONFI_TIMING_MODE|NAND_ONFI_DDR2_CFG|NAND_ONFI_IO_DRIVER_STRENGTH|NAND_TOGGLE_VENDOR_SPECIFIC_CFG,
+		.bad_block_flag_position = FIRST_PAGE,
+		.multi_plane_block_offset = 1,
+		.sharedpage_offset = 1,
+		.cmd_set_no = CMD_SET_3,
+		.selected_write_boot0_no = NAND_WRITE_BOOT0_GENERIC,
+		.selected_readretry_no = NAND_READRETRY_MICRON,
+		.ddr_info_no = DDR_INFO_PARAS1_DRV_2,
+		.id_number = 0x3,
+		.max_blk_erase_times = 1500,
+		.access_high_freq = 75,
+	},
 };
 
 struct sunxi_nand_flash_device raw_spansion[] = {
@@ -1086,7 +1119,7 @@ struct sunxi_nand_flash_device raw_intel[] = {
 		.ecc_mode = BCH_40,
 		.read_retry_type = 0x411201,
 		.ddr_type = ONFI_DDR,
-		.ddr_opt = NAND_ONFI_RB_STRENGTH | NAND_ONFI_TIMING_MODE | NAND_ONFI_DDR2_CFG |
+		.ddr_opt = NAND_VCCQ_1P8V | NAND_ONFI_RB_STRENGTH | NAND_ONFI_TIMING_MODE | NAND_ONFI_DDR2_CFG |
 			NAND_ONFI_IO_DRIVER_STRENGTH | NAND_TOGGLE_VENDOR_SPECIFIC_CFG,
 		.bad_block_flag_position = FIRST_PAGE,
 		.multi_plane_block_offset = 1,
@@ -1619,6 +1652,33 @@ struct sunxi_nand_flash_device raw_hynix[] = {
 
 };
 
+struct sunxi_nand_flash_device raw_winbond[] = {
+	{
+		.name = "W29N02KV",
+		.id = {0xef, 0xda, 0x10, 0x95, 0x06, 0xff, 0xff, 0xff},
+		.die_cnt_per_chip = 1,
+		.sect_cnt_per_page = 4,
+		.page_cnt_per_blk = 64,
+		.blk_cnt_per_die = 2048,
+		.operation_opt = NAND_RANDOM | NAND_MULTI_PROGRAM,
+		.valid_blk_ratio = VALID_BLK_RATIO_DEFAULT,
+		.access_freq = 40,
+		.ecc_mode = BCH_32,
+		.read_retry_type = READ_RETRY_TYPE_NULL,
+		.ddr_type = SDR,
+		.ddr_opt = 0x0,
+		.bad_block_flag_position = FIRST_TWO_PAGES,
+		.multi_plane_block_offset = 1,
+		.cmd_set_no = CMD_SET_2,
+		.selected_write_boot0_no = NAND_WRITE_BOOT0_GENERIC,
+		.selected_readretry_no = NAND_READRETRY_NO,
+		.id_number = 0x0,
+		.max_blk_erase_times = 60000,
+		.access_high_freq = 40,
+	},
+};
+
+
 struct nand_manufacture mfr_tbl[] = {
 	NAND_MANUFACTURE(NAND_MFR_MICRON, MICRON_NAME, raw_micron),
 	NAND_MANUFACTURE(NAND_MFR_SPANSION, SPANSION_NAME, raw_spansion),
@@ -1631,6 +1691,7 @@ struct nand_manufacture mfr_tbl[] = {
 	NAND_MANUFACTURE(NAND_MFR_FORESEE, FORESEE_NAME, raw_foresee),
 	NAND_MANUFACTURE(NAND_MFR_SAMSUNG, SAMSUNG_NAME, raw_samsung),
 	NAND_MANUFACTURE(NAND_MFR_HYNIX, HYNIX_NAME, raw_hynix),
+	NAND_MANUFACTURE(NAND_MFR_WINBOND, WINBOND_NAME, raw_winbond),
 };
 
 struct sunxi_nand_flash_device *sunxi_search_idtab_by_id(unsigned char *id)

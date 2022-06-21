@@ -47,11 +47,18 @@
 #define SHA1_160_MODE	0
 #define SHA2_256_MODE	1
 
-#define ALG_AES		(0x0)
-#define ALG_SHA256 (0x13)
-#define ALG_RSA    (0x20)
-#define ALG_TRANG  (0x30)
 #define TRANG_BYTE_LEN (32)
+
+/*alg type*/
+#define ALG_AES		(0x0)
+#define ALG_SM4		(0x3)
+#define ALG_SHA256	(0x13)
+#define ALG_SHA512	(0x15)
+#define ALG_RSA		(0x20)
+#define ALG_ECC		(0x21)
+#define ALG_SM2		(0x22)
+#define ALG_MD5		(0x10)
+#define ALG_TRANG	(0x30)
 
 #define CHANNEL_0 0
 #define CHANNEL_1 1

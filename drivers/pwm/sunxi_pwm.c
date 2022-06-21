@@ -17,9 +17,7 @@
  * along with this program;
  *
  */
-#if !defined CONFIG_MACH_SUN8IW20 && !defined CONFIG_MACH_SUN20IW1
-#include <asm/arch-sunxi/cpu_ncat.h>
-#endif
+#include <asm/arch-sunxi/cpu.h>
 #include <asm/io.h>
 #include <common.h>
 #include <asm/arch/pwm.h>

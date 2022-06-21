@@ -74,6 +74,194 @@ void aw_rawnand_chip_update_bbt(struct mtd_info *mtd, int block, int flag)
 
 	return;
 }
+
+static int aw_rawnand_chip_block_bad_check_first_page(struct mtd_info *mtd, int block)
+{
+	struct aw_nand_chip *chip = awnand_mtd_to_chip(mtd);
+
+	int ret = 0;
+	int page = 0;
+	uint8_t spare[chip->avalid_sparesize];
+	uint8_t *mdata = kzalloc(chip->pagesize,  GFP_KERNEL);
+	if (mdata == NULL) {
+		printf("malloc buffer fail\n");
+		return -ENOMEM;
+	}
+
+	page = block << chip->pages_per_blk_shift;
+
+	/*for used chip, maybe read whole page is better*/
+	ret = chip->read_page(mtd, chip, mdata, chip->pagesize, spare, chip->avalid_sparesize, page);
+	if (ret != ECC_ERR) {
+		if (spare[0] != 0xFF) {
+			ret = 1;
+			/*awrawnand_info("page@%d oob:%02x %02x %02x %02x %02x %02x %02x %02x\n", page, spare[0],*/
+			printf("page@%d oob:%02x %02x %02x %02x %02x %02x %02x %02x\n", page, spare[0],
+					spare[1], spare[2], spare[3], spare[4], spare[5], spare[6], spare[7]);
+			ret = BBT_B_BAD;
+			goto out;
+		}
+		ret = BBT_B_GOOD;
+	} else {
+		ret = BBT_B_BAD;
+	}
+
+out:
+	if (mdata)
+		kfree(mdata);
+	return ret;
+}
+
+static int aw_rawnand_chip_block_bad_check_first_two_pages(struct mtd_info *mtd, int block)
+{
+	struct aw_nand_chip *chip = awnand_mtd_to_chip(mtd);
+
+	int ret = 0;
+	int page = 0;
+	uint8_t spare[chip->avalid_sparesize];
+	uint8_t *mdata = kzalloc(chip->pagesize,  GFP_KERNEL);
+	if (mdata == NULL) {
+		printf("malloc buffer fail\n");
+		return -ENOMEM;
+	}
+
+	ret = aw_rawnand_chip_block_bad_check_first_page(mtd, block);
+	if (ret == BBT_B_BAD)
+		goto out;
+
+	page = block << chip->pages_per_blk_shift;
+	page++;
+
+	/*for used chip, maybe read whole page is better*/
+	ret = chip->read_page(mtd, chip, mdata, chip->pagesize, spare, chip->avalid_sparesize, page);
+	if (ret != ECC_ERR) {
+		if (spare[0] != 0xFF) {
+			ret = 1;
+			printf("page@%d:%02x %02x %02x %02x %02x %02x %02x %02x %02x %02x\n", page, spare[0],
+		spare[1], spare[2], spare[3], spare[4], spare[5], spare[6], spare[7], spare[8], spare[9]);
+			ret = BBT_B_BAD;
+		}
+		ret = BBT_B_GOOD;
+	} else {
+		ret = BBT_B_BAD;
+	}
+
+out:
+	if (mdata)
+		kfree(mdata);
+	return ret;
+
+}
+
+static int aw_rawnand_chip_block_bad_check_last_page(struct mtd_info *mtd, int block)
+{
+	struct aw_nand_chip *chip = awnand_mtd_to_chip(mtd);
+
+	int ret = 0;
+	int page = 0;
+	uint8_t spare[chip->avalid_sparesize];
+	uint8_t *mdata = kzalloc(chip->pagesize,  GFP_KERNEL);
+	if (mdata == NULL) {
+		printf("malloc buffer fail\n");
+		return -ENOMEM;
+	}
+
+
+	page = (block << chip->pages_per_blk_shift) + chip->pages_per_blk_mask;
+
+	/*for used chip, maybe read whole page is better*/
+	ret = chip->read_page(mtd, chip, mdata, chip->pagesize, spare, chip->avalid_sparesize, page);
+	if (ret != ECC_ERR) {
+		if (spare[0] != 0xFF) {
+			ret = 1;
+			/*awrawnand_info("page@%d oob:%02x %02x %02x %02x %02x %02x %02x %02x\n", page, spare[0],*/
+			printf("page@%d oob:%02x %02x %02x %02x %02x %02x %02x %02x\n", page, spare[0],
+					spare[1], spare[2], spare[3], spare[4], spare[5], spare[6], spare[7]);
+			ret = BBT_B_BAD;
+			goto out;
+		}
+		ret = BBT_B_GOOD;
+	} else {
+		ret = BBT_B_BAD;
+	}
+
+out:
+	if (mdata)
+		kfree(mdata);
+	return ret;
+
+}
+
+static int aw_rawnand_chip_block_bad_check_last_two_pages(struct mtd_info *mtd, int block)
+{
+	struct aw_nand_chip *chip = awnand_mtd_to_chip(mtd);
+
+	int ret = 0;
+	int page = 0;
+	uint8_t spare[chip->avalid_sparesize];
+	uint8_t *mdata = kzalloc(chip->pagesize,  GFP_KERNEL);
+	if (mdata == NULL) {
+		printf("malloc buffer fail\n");
+		return -ENOMEM;
+	}
+
+	ret = aw_rawnand_chip_block_bad_check_last_page(mtd, block);
+	if (ret == BBT_B_BAD)
+		goto out;
+
+	page = (block << chip->pages_per_blk_shift) + chip->pages_per_blk_mask;
+	page--;
+
+	/*for used chip, maybe read whole page is better*/
+	ret = chip->read_page(mtd, chip, mdata, chip->pagesize, spare, chip->avalid_sparesize, page);
+	if (ret != ECC_ERR) {
+		if (spare[0] != 0xFF) {
+			ret = 1;
+			/*awrawnand_info("page@%d oob:%02x %02x %02x %02x %02x %02x %02x %02x\n", page, spare[0],*/
+			printf("page@%d oob:%02x %02x %02x %02x %02x %02x %02x %02x\n", page, spare[0],
+					spare[1], spare[2], spare[3], spare[4], spare[5], spare[6], spare[7]);
+			ret = BBT_B_BAD;
+			goto out;
+		}
+		ret = BBT_B_GOOD;
+	} else {
+		ret = BBT_B_BAD;
+		goto out;
+	}
+
+out:
+	if (mdata)
+		kfree(mdata);
+	return ret;
+}
+
+static int aw_rawnand_chip_block_bad_check_first_and_last_pages(struct mtd_info *mtd, int block)
+{
+	int ret = 0;
+
+	ret = aw_rawnand_chip_block_bad_check_first_page(mtd, block);
+	if (ret == BBT_B_BAD)
+		goto out;
+	else
+		ret = aw_rawnand_chip_block_bad_check_last_page(mtd, block);
+
+out:
+	return ret;
+}
+
+static int aw_rawnand_chip_block_bad_check_first_two_and_last_pages(struct mtd_info *mtd, int block)
+{
+	int ret = 0;
+
+	ret = aw_rawnand_chip_block_bad_check_first_two_pages(mtd, block);
+	if (ret == BBT_B_BAD)
+		goto out;
+	else
+		ret = aw_rawnand_chip_block_bad_check_last_page(mtd, block);
+out:
+	return ret;
+}
+
 /**
  * aw_rawnand_chip_block_bad - read bad block marker from the chip
  * @mtd: MTD device structure
@@ -84,21 +272,13 @@ int aw_rawnand_chip_block_bad(struct mtd_info *mtd, int block)
 	struct aw_nand_chip *chip = awnand_mtd_to_chip(mtd);
 
 	int ret = 0;
-	int page = 0;
-	uint8_t spare[chip->avalid_sparesize];
-	int snd_flag = 0;
-	uint8_t *mdata = kzalloc(chip->pagesize,  GFP_KERNEL);
-	if (mdata == NULL) {
-		printf("malloc buffer fail\n");
-		return -ENOMEM;
-	}
 
 	ret = aw_rawnand_chip_check_badblock_bbt(mtd, block);
 	if (ret == BBT_B_GOOD) {
-		printf("block@%d bbt good\n", block);
+		awrawnand_dbg("block@%d bbt good\n", block);
 		goto out;
 	} else if (ret == BBT_B_BAD) {
-		printf("block@%d bbt bad\n", block);
+		awrawnand_dbg("block@%d bbt bad\n", block);
 		goto out;
 	} else {
 		awrawnand_dbg(
@@ -106,60 +286,44 @@ int aw_rawnand_chip_block_bad(struct mtd_info *mtd, int block)
 	}
 
 
-	if (chip->badblock_mark_pos & FIRST_PAGE)
-		page = block << chip->pages_per_blk_shift;
-	else if (chip->badblock_mark_pos & LAST_PAGE) {
-		page = (block << chip->pages_per_blk_shift) +
-			chip->pages_per_blk_mask;
+	if (chip->badblock_mark_pos == PST_FIRST_PAGE) {
+
+		ret = aw_rawnand_chip_block_bad_check_first_page(mtd, block);
+
+	} else if ((chip->badblock_mark_pos == PST_FIRST_TWO_PAGES)) {
+
+		ret = aw_rawnand_chip_block_bad_check_first_two_pages(mtd, block);
+
+	} else if (chip->badblock_mark_pos == PST_LAST_PAGE) {
+
+		ret = aw_rawnand_chip_block_bad_check_last_page(mtd, block);
+
+	} else if (chip->badblock_mark_pos == PST_LAST_TWO_PAGES) {
+
+		ret = aw_rawnand_chip_block_bad_check_last_two_pages(mtd, block);
+
+	} else if (chip->badblock_mark_pos == PST_FIRST_AND_LAST_PAGES) {
+
+		ret = aw_rawnand_chip_block_bad_check_first_and_last_pages(mtd, block);
+
+	} else if (chip->badblock_mark_pos == PST_FIRST_TWO_AND_LAST_PAGES) {
+
+		ret = aw_rawnand_chip_block_bad_check_first_two_and_last_pages(mtd, block);
+
 	} else {
 		awrawnand_err("Unknow the block mark use default mark pos(first page)\n");
+		goto out;
 	}
 
-	/*ret = chip->read_page_spare(mtd, chip, spare, chip->avalid_sparesize, page);*/
-	/*for used chip, maybe read whole page is better*/
-	ret = chip->read_page(mtd, chip, mdata, chip->pagesize, spare, chip->avalid_sparesize, page);
-	if (ret != ECC_ERR) {
-		if (spare[0] != 0xFF) {
-			ret = 1;
-			awrawnand_info("page@%d oob:%02x %02x %02x %02x %02x %02x %02x %02x\n", page, spare[0],
-					spare[1], spare[2], spare[3], spare[4], spare[5], spare[6], spare[7]);
-			aw_rawnand_chip_update_bbt(mtd, block, BBT_B_BAD);
-			ret = BBT_B_BAD;
-			goto out;
-		}
-	} else {
+	if (ret == BBT_B_BAD) {
 		aw_rawnand_chip_update_bbt(mtd, block, BBT_B_BAD);
 		ret = BBT_B_BAD;
+	} else {
+		aw_rawnand_chip_update_bbt(mtd, block, BBT_B_GOOD);
+		ret = BBT_B_GOOD;
 	}
 
-	if ((chip->badblock_mark_pos == FIRST_TWO_PAGES)) {
-		page++;
-		snd_flag = 1;
-	} else if ((chip->badblock_mark_pos == LAST_TWO_PAGES)) {
-		page--;
-		snd_flag = 1;
-	}
-
-	if (snd_flag) {
-		/*ret = chip->read_page_spare(mtd, chip, spare, chip->avalid_sparesize, page);*/
-		/*for used chip, maybe read whole page is better*/
-		ret = chip->read_page(mtd, chip, mdata, chip->pagesize, spare, chip->avalid_sparesize, page);
-		if (ret != ECC_ERR) {
-			if (spare[0] != 0xFF) {
-				ret = 1;
-				printf("page@%d:%02x %02x %02x %02x %02x %02x %02x %02x %02x %02x\n", page, spare[0],
-			spare[1], spare[2], spare[3], spare[4], spare[5], spare[6], spare[7], spare[8], spare[9]);
-				aw_rawnand_chip_update_bbt(mtd, block, BBT_B_BAD);
-				ret = BBT_B_BAD;
-			}
-		} else {
-			aw_rawnand_chip_update_bbt(mtd, block, BBT_B_BAD);
-			ret = BBT_B_BAD;
-		}
-	}
 out:
-	if (mdata)
-		kfree(mdata);
 	return ret;
 }
 
@@ -227,21 +391,44 @@ int aw_rawnand_chip_block_markbad(struct mtd_info *mtd, int block)
 		goto out;
 	}
 
-	if (chip->badblock_mark_pos == FIRST_PAGE)
+	if (chip->badblock_mark_pos == PST_FIRST_PAGE) {
+
 		ret = chip->write_page(mtd, chip, mdata, pagesize, spare, sparesize, page);
-	else if (chip->badblock_mark_pos == LAST_PAGE) {
+
+	} else if (chip->badblock_mark_pos == PST_LAST_PAGE) {
+
 		page += chip->pages_per_blk_mask;
 		ret = chip->write_page(mtd, chip, mdata, pagesize, spare, sparesize, page);
-	} else if (chip->badblock_mark_pos == FIRST_TWO_PAGES) {
+
+	} else if (chip->badblock_mark_pos == PST_FIRST_TWO_PAGES) {
+
 		ret = chip->write_page(mtd, chip, mdata, pagesize, spare, sparesize, page);
 		page++;
 		ret |= chip->write_page(mtd, chip, mdata, pagesize, spare, sparesize, page);
-	} else if (chip->badblock_mark_pos == LAST_TWO_PAGES) {
+
+	} else if (chip->badblock_mark_pos == PST_LAST_TWO_PAGES) {
+
 		page += chip->pages_per_blk_mask;
 		ret = chip->write_page(mtd, chip, mdata, pagesize, spare, sparesize, page);
 		page--;
 		ret |= chip->write_page(mtd, chip, mdata, pagesize, spare, sparesize, page);
-	} else{
+
+	} else if (chip->badblock_mark_pos == PST_FIRST_AND_LAST_PAGES) {
+
+		ret = chip->write_page(mtd, chip, mdata, pagesize, spare, sparesize, page);
+		page += chip->pages_per_blk_mask;
+		ret = chip->write_page(mtd, chip, mdata, pagesize, spare, sparesize, page);
+
+	} else if (chip->badblock_mark_pos == PST_FIRST_TWO_AND_LAST_PAGES) {
+
+		ret = chip->write_page(mtd, chip, mdata, pagesize, spare, sparesize, page);
+		page++;
+		ret |= chip->write_page(mtd, chip, mdata, pagesize, spare, sparesize, page);
+		page--;
+		page += chip->pages_per_blk_mask;
+		ret = chip->write_page(mtd, chip, mdata, pagesize, spare, sparesize, page);
+
+	} else {
 		awrawnand_err("Unknow the block mark use default mark pos(first page)\n");
 		ret = chip->write_page(mtd, chip, mdata, pagesize, spare, sparesize, page);
 	}

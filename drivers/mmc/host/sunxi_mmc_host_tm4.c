@@ -123,7 +123,7 @@ static void sunxi_mmc_clk_io_onoff(int sdc_no, int onoff, int reset_clk)
 	int rval;
 	struct sunxi_mmc_priv *priv = &mmc_host[sdc_no];
 
-#if (!defined(CONFIG_MACH_SUN50IW1))
+#if (!(defined(CONFIG_MACH_SUN50IW1) || defined(CONFIG_MACH_SUN8IW11)))
 	/* config ahb clock */
 	if (onoff) {
 		rval = readl(priv->hclkrst);
@@ -270,17 +270,11 @@ static int mmc_set_mod_clk(struct sunxi_mmc_priv *priv, unsigned int hz)
 		pll = CCM_MMC_CTRL_OSCM24;
 		pll_hz = 24000000;
 	} else {
-	/*
-	 * The platform which used tm4 need to config CCM_MMC_CTRL_PLL6X2
-	 */
-#ifdef CCM_MMC_CTRL_PLL6X2
-		pll = CCM_MMC_CTRL_PLL6X2;
-		pll_hz = clock_get_pll6() * 2 *1000000;
-#else
-		MMCINFO("There is no 2X pll!\n");
-		return -1;
-#endif
+		pll = sunxi_mmc_get_src_clk_no(priv->mmc_no, mod_hz, 4);
+		pll_hz = sunxi_host_src_clk(priv->mmc_no, (pll>>24), 4);
 	}
+
+	MMCDBG("pll config pll:%x pll_hz:%d mod_hz:%d\n", pll, pll_hz, mod_hz);
 
 	div = pll_hz / mod_hz;
 	if (pll_hz % mod_hz)

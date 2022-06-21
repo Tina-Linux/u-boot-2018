@@ -22,6 +22,10 @@ config SUN8I_RSB
 	  (RSB) support. This controller is responsible for communicating
 	  with various RSB based devices, such as AXP223, AXP8XX PMICs,
 	  and AC100/AC200 ICs.
+config SUNXI_GIC_V3
+          bool
+          help
+            Support for the GIC controller for 600
 config SUNXI_NCAT
           bool
           help
@@ -153,6 +157,13 @@ config MACH_SUN50IW10
 	select SUNXI_NCAT
 	select SUNXI_SECURE
 
+config MACH_SUN55IW3
+	bool "sun55i(Allwinner sun55iw3)"
+	select SUNXI_ARM64
+	select CPU_V7
+	select SUNXI_SECURE
+	select SUNXI_GIC_V3
+
 config MACH_SUN50IW11
 	bool "sun50i(Allwinner sun50iw11)"
 	select SUNXI_ARM64
@@ -176,6 +187,12 @@ config MACH_SUN8IW7
 	select CPU_V7
 	select SUNXI_VERSION1
 	select SUNXI_SECURE
+
+config MACH_SUN8IW11
+
+	bool "sun8i(Allwinner sun8iw11)"
+	select CPU_V7
+	select SUNXI_VERSION1
 
 config MACH_SUN8IW15
 	bool "sun8i(Allwinner sun8iw15)"
@@ -301,6 +318,7 @@ config SYS_CLK_FREQ
 	default 1008000000 if MACH_SUN8IW16
 	default 1008000000 if MACH_SUN8IW18
 	default 1008000000 if MACH_SUN8IW19
+	default 1008000000 if MACH_SUN55IW3
 	default 1008000000
 
 config SYS_CONFIG_NAME
@@ -315,12 +333,14 @@ config SYS_CONFIG_NAME
 	default "sun8iw18p1" if MACH_SUN8IW18
 	default "sun8iw19p1" if MACH_SUN8IW19
 	default "sun8iw7p1" if MACH_SUN8IW7
+	default "sun8iw11p1" if MACH_SUN8IW11
 	default "sun8iw20p1" if MACH_SUN8IW20
 	default "sun8iw21p1" if MACH_SUN8IW21
+	default "sun55iw3p1" if  MACH_SUN55IW3
 
 config SUNXI_ARM64
 	bool "set SUNXI ARM64"
-	default y if MACH_SUN50IW3 || MACH_SUN50IW5 || MACH_SUN50IW9 || MACH_SUN50IW10 || MACH_SUN50IW11
+	default y if MACH_SUN50IW3 || MACH_SUN50IW5 || MACH_SUN50IW9 || MACH_SUN50IW10 || MACH_SUN50IW11 || MACH_SUN55IW3
 	---help---
 	set SUNXI_ARM64 when SUN50I
 

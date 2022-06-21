@@ -189,6 +189,24 @@
 				allwinner,pull = <0>;
 			};
 
+			dsi2lane_pins_a: dsi2lane@0 {
+				allwinner,pins = "PD0", "PD1", "PD2", "PD3", "PD4", "PD5";
+				allwinner,pname = "PD0", "PD1", "PD2", "PD3", "PD4", "PD5";
+				allwinner,function = "dsi2lane";
+				allwinner,muxsel = <4>;
+				allwinner,drive = <3>;
+				allwinner,pull = <0>;
+			};
+
+			dsi2lane_pins_b: dsi2lane@1 {
+				allwinner,pins = "PD0", "PD1", "PD2", "PD3", "PD4", "PD5";
+				allwinner,pname = "PD0", "PD1", "PD2", "PD3", "PD4", "PD5";
+				allwinner,function = "dsi2lane_suspend";
+				allwinner,muxsel = <15>;
+				allwinner,drive = <1>;
+				allwinner,pull = <0>;
+			};
+
 			dsi4lane_pins_a: dsi4lane@0 {
 				allwinner,pins = "PD0", "PD1", "PD2", "PD3", "PD4", "PD5", "PD6", "PD7", "PD8", "PD9";
 				allwinner,pname = "PD0", "PD1", "PD2", "PD3", "PD4", "PD5", "PD6", "PD7", "PD8", "PD9";
@@ -220,10 +238,9 @@
 			};
 
 			spi0_pins_a: spi0@0 {
-				allwinner,pins = "PC2", "PC4", "PC5",
-						"PC7", "PC6";
+				allwinner,pins = "PC2", "PC4", "PC5";
 				allwinner,pname = "spi0_sclk", "spi0_mosi",
-						"spi0_miso", "spi0_hold", "spi0_wp";
+						"spi0_miso";
 				allwinner,function = "spi0";
 				allwinner,muxsel = <2>;
 				allwinner,drive = <1>;
@@ -231,8 +248,9 @@
 			};
 
 			spi0_pins_b: spi0@1 {
-				allwinner,pins = "PC3";
-				allwinner,pname = "spi0_cs0";
+				allwinner,pins = "PC3", "PC7", "PC6";
+				allwinner,pname = "spi0_cs0", "spi0_hold",
+						"spi0_wp";
 				allwinner,function = "spi0";
 				allwinner,muxsel = <2>;
 				allwinner,drive = <1>;
@@ -351,8 +369,8 @@
 				compatible = "spi-nand";
 				spi-max-frequency=<0x5F5E100>;
 				reg = <0x0>;
-				spi-rx-bus-width=<0x01>;
-				spi-tx-bus-width=<0x01>;
+				spi-rx-bus-width=<0x04>;
+				spi-tx-bus-width=<0x04>;
 				status="disabled";
 			};
 			spi_board0 {

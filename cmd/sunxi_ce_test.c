@@ -9,6 +9,7 @@
 #include <sunxi_board.h>
 #include <asm/arch/ce.h>
 #include <sunxi_board.h>
+#include <asm/arch/timer.h>
 
 int do_sha256_test(cmd_tbl_t *cmdtp, int flag, int argc, char *const argv[])
 {
@@ -112,7 +113,8 @@ int do_aes_test(cmd_tbl_t *cmdtp, int flag, int argc, char *const argv[])
 	phys_addr_t dec_addr = simple_strtol(argv[4], NULL, 16);
 	phys_addr_t key_addr = 0;
 	u32 key_len = 32;
-	u32 s_ctl;
+	u32 s_ctl, byte_algin = 0;
+	s32 ret;
 
 	if ((strcmp(argv[5], SSK_NAME) == 0) &&
 				(strlen(argv[5]) == strlen(SSK_NAME))) {
@@ -133,6 +135,94 @@ int do_aes_test(cmd_tbl_t *cmdtp, int flag, int argc, char *const argv[])
 		key_addr = simple_strtol(argv[5], NULL, 16);
 		s_ctl = SUNXI_AES_CBC_USERKEY_CFG;
 	}
+
+	if (argc == 7) {
+		byte_algin = simple_strtol(argv[6], NULL, 16);
+	}
+
+	if (!byte_algin) {
+		if ((src_addr & (CACHE_LINE_SIZE - 1)) != 0) {
+			pr_err("start addr 0x%x not aligned with cache line size 0x%x\n",
+					src_addr, CACHE_LINE_SIZE);
+			return CMD_RET_FAILURE;
+		}
+
+		if ((src_len & (CACHE_LINE_SIZE - 1)) != 0) {
+			pr_err("len 0x%x not aligned with cache line size 0x%x\n",
+					src_len, CACHE_LINE_SIZE);
+			return CMD_RET_FAILURE;
+		}
+
+		if ((enc_addr & (CACHE_LINE_SIZE - 1)) != 0) {
+			pr_err("enc addr 0x%x not aligned with cache line size 0x%x\n",
+					enc_addr, CACHE_LINE_SIZE);
+			return CMD_RET_FAILURE;
+		}
+
+		if ((dec_addr & (CACHE_LINE_SIZE - 1)) != 0) {
+			pr_err("dec addr 0x%x not aligned with cache line size 0x%x\n",
+					dec_addr, CACHE_LINE_SIZE);
+			return CMD_RET_FAILURE;
+		}
+	}
+
+	tick_printf("aes test start 0\n");
+	sunxi_ss_open();
+	sunxi_aes_with_hardware((u8 *)IOMEM_ADDR(enc_addr), (u8 *)IOMEM_ADDR(src_addr), src_len,
+				(u8 *)IOMEM_ADDR(key_addr), key_len, s_ctl,
+				SS_DIR_ENCRYPT);
+	sunxi_aes_with_hardware((u8 *)IOMEM_ADDR(dec_addr), (u8 *)IOMEM_ADDR(enc_addr), src_len,
+				(u8 *)IOMEM_ADDR(key_addr), key_len, s_ctl,
+				SS_DIR_DECRYPT);
+
+	ret = memcmp((u8 *)IOMEM_ADDR(src_addr), (u8 *)IOMEM_ADDR(dec_addr), src_len);
+	if (ret != 0) {
+		tick_printf("aes test fail\n");
+		tick_printf("raw\n");
+		sunxi_dump((u8 *)IOMEM_ADDR(src_addr), src_len);
+		tick_printf("enc\n");
+		sunxi_dump((u8 *)IOMEM_ADDR(enc_addr), src_len);
+		tick_printf("dec\n");
+		sunxi_dump((u8 *)IOMEM_ADDR(dec_addr), src_len);
+	} else {
+		tick_printf("aes test sucess\n");
+	}
+
+	return CMD_RET_SUCCESS;
+}
+
+#define AES_128_ECB_USERKEY_CFG                                              \
+	(_SUNXI_AES_CFG | (SS_AES_KEY_128BIT << 0) | (SS_AES_MODE_ECB << 8) |  \
+	 (SS_KEY_SELECT_INPUT << 20))
+
+#define AES_256_ECB_USERKEY_CFG                                              \
+	(_SUNXI_AES_CFG | (SS_AES_KEY_256BIT << 0) | (SS_AES_MODE_ECB << 8) |  \
+	 (SS_KEY_SELECT_INPUT << 20))
+
+
+int do_aes_perf_test(cmd_tbl_t *cmdtp, int flag, int argc, char *const argv[])
+{
+	phys_addr_t src_addr = simple_strtol(argv[1], NULL, 16);
+	u32 src_len  = simple_strtol(argv[2], NULL, 16);
+	phys_addr_t enc_addr = simple_strtol(argv[3], NULL, 16);
+	phys_addr_t dec_addr = simple_strtol(argv[4], NULL, 16);
+	phys_addr_t key_addr = 0;
+	u32 key_bit = 128;
+	u32 key_len = 16;
+	u32 s_ctl = AES_128_ECB_USERKEY_CFG;
+	int i, ret;
+	u64 start, end, tmp;
+
+	key_addr = simple_strtol(argv[5], NULL, 16);
+	key_bit = simple_strtol(argv[6], NULL, 10);
+	if (key_bit == 128) {
+		s_ctl = AES_128_ECB_USERKEY_CFG;
+		key_len = key_bit >> 3;
+	} else if (key_bit == 256) {
+		s_ctl = AES_256_ECB_USERKEY_CFG;
+		key_len = key_bit >> 3;
+	}
+	pr_err("key_len = %d\n", key_len);
 
 	if ((src_addr & (CACHE_LINE_SIZE - 1)) != 0) {
 		pr_err("start addr 0x%x not aligned with cache line size 0x%x\n",
@@ -157,21 +247,36 @@ int do_aes_test(cmd_tbl_t *cmdtp, int flag, int argc, char *const argv[])
 		return CMD_RET_FAILURE;
 	}
 
-	tick_printf("aes test start 0\n");
 	sunxi_ss_open();
-	sunxi_aes_with_hardware((u8 *)IOMEM_ADDR(enc_addr), (u8 *)IOMEM_ADDR(src_addr), src_len,
-				(u8 *)IOMEM_ADDR(key_addr), key_len, s_ctl,
-				SS_DIR_ENCRYPT);
-	sunxi_aes_with_hardware((u8 *)IOMEM_ADDR(dec_addr), (u8 *)IOMEM_ADDR(enc_addr), src_len,
+	tick_printf("test 100 times start\n");
+	start = read_timer();
+	for (i = 0; i < 50; i++) {
+		sunxi_aes_with_hardware((u8 *)IOMEM_ADDR(enc_addr),
+				(u8 *)IOMEM_ADDR(src_addr), src_len,
+				(u8 *)IOMEM_ADDR(key_addr), key_len, s_ctl, SS_DIR_ENCRYPT);
+		sunxi_aes_with_hardware((u8 *)IOMEM_ADDR(dec_addr),
+				(u8 *)IOMEM_ADDR(enc_addr), src_len,
 				(u8 *)IOMEM_ADDR(key_addr), key_len, s_ctl,
 				SS_DIR_DECRYPT);
-	tick_printf("aes test end\n");
-	tick_printf("raw\n");
-	sunxi_dump((u8 *)IOMEM_ADDR(src_addr), src_len);
-	tick_printf("enc\n");
-	sunxi_dump((u8 *)IOMEM_ADDR(enc_addr), src_len);
-	tick_printf("dec\n");
-	sunxi_dump((u8 *)IOMEM_ADDR(dec_addr), src_len);
+	}
+
+	end = read_timer();
+	tmp = end - start;
+	pr_err("100 times need counter:%lld\n", tmp);
+
+	ret = memcmp((u8 *)IOMEM_ADDR(src_addr), (u8 *)IOMEM_ADDR(dec_addr), src_len);
+	if (ret != 0) {
+		tick_printf("aes test fail\n");
+		tick_printf("raw\n");
+		sunxi_dump((u8 *)IOMEM_ADDR(src_addr), src_len);
+		tick_printf("enc\n");
+		sunxi_dump((u8 *)IOMEM_ADDR(enc_addr), src_len);
+		tick_printf("dec\n");
+		sunxi_dump((u8 *)IOMEM_ADDR(dec_addr), src_len);
+	} else {
+		tick_printf("aes test sucess\n");
+	}
+
 	return CMD_RET_SUCCESS;
 }
 
@@ -180,6 +285,7 @@ static cmd_tbl_t cmd_ce_test[] = {
 	U_BOOT_CMD_MKENT(rsa, 10, 0, do_rsa_test, "", ""),
 	U_BOOT_CMD_MKENT(rng, 5, 0, do_rng_test, "", ""),
 	U_BOOT_CMD_MKENT(aes, 10, 0, do_aes_test, "", ""),
+	U_BOOT_CMD_MKENT(aes_perf_test, 10, 0, do_aes_perf_test, "", ""),
 };
 
 int do_sunxi_ce_test(cmd_tbl_t *cmdtp, int flag, int argc, char *const argv[])

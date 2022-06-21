@@ -60,6 +60,11 @@ int  __attribute__((weak)) clock_set_corepll(int frequency)
 	return 0;
 }
 
+int  __attribute__((weak)) rtc_set_dcxo_off(void)
+{
+	return 0;
+}
+
 DECLARE_GLOBAL_DATA_PTR;
 
 #ifdef CONFIG_SUNXI_OVERLAY
@@ -225,6 +230,9 @@ int board_init(void)
 #endif
 	}
 #endif
+
+	rtc_set_dcxo_off();
+
 	if ((work_mode == WORK_MODE_BOOT) ||
 		(work_mode == WORK_MODE_CARD_PRODUCT) ||
 		(work_mode == WORK_MODE_CARD_UPDATE))

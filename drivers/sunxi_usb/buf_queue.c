@@ -24,6 +24,7 @@
 
 #include "buf_queue.h"
 #include <malloc.h>
+#include "sunxi_board.h"
 
 //extern __u32 NAND_GetPageSize(void);
 __weak  __u32 NAND_GetLogicPageSize(void)
@@ -66,6 +67,13 @@ int buf_queue_init(void)
         buf_queue_page_size = 64*1024;
         buf_queue_max_len = 20;
     }
+
+	if (get_boot_work_mode() == WORK_MODE_USB_DEBUG) {
+		/*force queue size for usb debug*/
+		buf_queue_page_size = 64 * 1024;
+		buf_queue_max_len	= 20;
+	}
+
     printf("buf queue page size = %d\n", buf_queue_page_size);
 
     buf_queue_base_buf = NULL;

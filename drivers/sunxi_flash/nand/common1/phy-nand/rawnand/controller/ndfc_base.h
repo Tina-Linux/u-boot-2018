@@ -28,7 +28,8 @@
 #define _NAND_CONTROLLER_H
 
 #include "../rawnand_cfg.h"
-#include "../rawnand.h"
+//#include "../rawnand.h"
+#include <sunxi_nand.h>
 
 #define MAX_CHANNEL (NAND_GetMaxChannelCnt())
 #define MAX_CHIP_PER_CHANNEL 4

@@ -18,13 +18,15 @@
 #include "../nand_boot.h"
 #include "rawnand_chip.h"
 #include "controller/ndfc_ops.h"
-#include "rawnand.h"
+/*#include "rawnand.h"*/
+#include <sunxi_nand.h>
 #include "rawnand_base.h"
 #include "rawnand_cfg.h"
 #include "rawnand_debug.h"
 #include "rawnand_ids.h"
 #include "rawnand_readretry.h"
 #include "../../nand_osal_uboot.h"
+#include <sunxi_nand_errno.h>
 
 
 struct nand_phy_write_lsb_cache nand_phy_w_cache[NAND_OPEN_BLOCK_CNT] = {

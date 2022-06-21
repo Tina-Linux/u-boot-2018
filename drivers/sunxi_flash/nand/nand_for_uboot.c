@@ -21,10 +21,15 @@
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston,
  * MA 02111-1307 USA
  */
+
 #include <common.h>
 #include <malloc.h>
 #include <sunxi_mbr.h>
 #include "nand_bsp.h"
+
+#ifndef CONFIG_SUNXI_COMM_NAND
+#include <sunxi_nand_partitions.h>
+#endif
 
 extern int NAND_UbootInit(int boot_mode);
 extern int NAND_UbootToPhy(void);
@@ -53,7 +58,11 @@ int  mbr_burned_flag;
 int nandphy_had_init;
 #endif
 int nand_open_count;
-static int  nand_open_times;
+int nand_open_times;
+
+#ifndef CONFIG_MACH_SUN20IW1
+extern struct nand_partitions nand_parts;
+#endif
 
 int __attribute__((weak)) NAND_UbootInit(__maybe_unused int boot_mode)
 {
@@ -180,24 +189,33 @@ uint32 __attribute__((weak)) get_nftl_cap(void)
 	return -1;
 }
 
+int __attribute__((weak)) nand_get_parts(char *buffer, uint len)
+{
+	printf("common1(partition3) need it, here is a weak func\n");
+	return -1;
+}
+
+
 int nand_get_mbr(char *buffer, uint len)
 {
 	int i,j;
 
 	sunxi_mbr_t *mbr = (sunxi_mbr_t *)buffer;
 
-#if defined(CONFIG_MACH_SUN50IW10)
-		nand_mbr.PartCount = 1;
-		nand_mbr.array[0].addr = 0;
-		nand_mbr.array[0].len = 0;
-		nand_mbr.array[0].user_type = 0x8000;
-		nand_mbr.array[0].classname[0] = 'a';
-		nand_mbr.array[0].classname[1] = 'l';
-		nand_mbr.array[0].classname[2] = 'l';
-		nand_mbr.array[0].classname[3] = '\0';
-		printf("force one part\n");
-		goto out;
-#else
+/*
+ *#if defined(CONFIG_MACH_SUN50IW10)
+ *                nand_mbr.PartCount = 1;
+ *                nand_mbr.array[0].addr = 0;
+ *                nand_mbr.array[0].len = 0;
+ *                nand_mbr.array[0].user_type = 0x8000;
+ *                nand_mbr.array[0].classname[0] = 'a';
+ *                nand_mbr.array[0].classname[1] = 'l';
+ *                nand_mbr.array[0].classname[2] = 'l';
+ *                nand_mbr.array[0].classname[3] = '\0';
+ *                printf("force one part\n");
+ *                goto out;
+ *#else
+ */
 
 		nand_mbr.PartCount = mbr->PartCount + 1;
 		nand_mbr.array[0].addr = 0;
@@ -207,7 +225,7 @@ int nand_get_mbr(char *buffer, uint len)
 		nand_mbr.array[0].classname[1] = 'b';
 		nand_mbr.array[0].classname[2] = 'r';
 		nand_mbr.array[0].classname[3] = '\0';
-#endif
+/*#endif*/
 	for(i=1; i<nand_mbr.PartCount; i++)
 	{
 		for(j=0;j<16;j++)
@@ -226,9 +244,13 @@ int nand_get_mbr(char *buffer, uint len)
 	nand_mbr.array[nand_mbr.PartCount-1].addr = nand_mbr.array[nand_mbr.PartCount-2].addr + nand_mbr.array[nand_mbr.PartCount-2].len;
 	nand_mbr.array[nand_mbr.PartCount-1].len = 0;
 
-#if defined(CONFIG_MACH_SUN50IW10)
-out:
-#endif
+/*
+ *#if defined(CONFIG_MACH_SUN50IW10)
+ *out:
+ *#endif
+ */
+
+	nand_get_parts(buffer, len);
 //for DEBUG
 	{
 		printf("total part: %d\n", nand_mbr.PartCount);
@@ -262,6 +284,7 @@ int nand_uboot_init_force_sprite(int boot_mode)
 }
 int nand_uboot_exit(int force)
 {
+
 	if(!nand_open_times)
 	{
 		printf("nand not opened\n");
@@ -271,9 +294,6 @@ int nand_uboot_exit(int force)
 	{
 		if(nand_open_times)
 		{
-			nand_open_times = 0;
-			nand_open_count = 0;
-			printf("NAND_UbootExit\n");
 			return NAND_UbootExit();
 		}
 	}

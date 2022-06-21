@@ -14,7 +14,8 @@
 //#include <linux/mtd/aw-spinand-nftl.h>
 #include "../../aw_nand_type.h"
 #include "../nand.h"
-#include "rawnand.h"
+#include <sunxi_nand.h>
+//#include "rawnand.h"
 
 //#define SECTOR_SIZE (512)
 /*

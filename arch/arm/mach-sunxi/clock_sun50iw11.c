@@ -296,7 +296,7 @@ int clock_set_corepll(int frequency)
 	struct core_pll_freq_tbl  pll_factor;
 
 	/*fix reset circuit detection threshold*/
-	rtc_set_vccio_det_spare();
+	//rtc_set_vccio_det_spare();
 
 	if (frequency == clock_get_corepll())
 		return 0;

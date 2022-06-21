@@ -62,7 +62,18 @@ int do_sprite_test(cmd_tbl_t *cmdtp, int flag, int argc, char * const argv[])
 		return ret;
 	}
 #endif
-	else {
+	else if (get_boot_work_mode() == WORK_MODE_USB_DEBUG) {
+
+		printf("run usb debug\n");
+		if (sunxi_usb_dev_register(2)) {
+			printf("sunxi usb test: invalid usb device\n");
+		}
+
+		/*disable dcache for modify dram through usb without flush*/
+		printf("disable D cache\n");
+		dcache_disable();
+		sunxi_usb_main_loop(0);
+	} else {
 		printf("others\n");
 	}
 

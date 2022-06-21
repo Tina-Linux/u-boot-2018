@@ -106,5 +106,6 @@ obj-y += thermal/
 obj-$(CONFIG_SUNXI_POWER) += sunxi_power/
 obj-$(CONFIG_SUNXI_ARISC_EXIST) += arisc/
 obj-$(CONFIG_XTENSA_DSP) += dsp/
+obj-$(CONFIG_RISCV_E907) += riscv/
 obj-$(CONFIG_MACH_PIC32) += ddr/microchip/
 endif

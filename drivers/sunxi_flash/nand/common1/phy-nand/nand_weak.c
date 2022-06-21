@@ -7,7 +7,8 @@
  */
 
 #include "../aw_nand_type.h"
-#include "nand-partition/phy.h"
+/*#include "nand-partition/phy.h"*/
+#include <sunxi_nand_partitions.h>
 #include "nand_boot.h"
 
 unsigned int __attribute__((weak)) spinand_nftl_get_super_page_size(int type)

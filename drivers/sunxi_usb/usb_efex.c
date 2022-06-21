@@ -92,6 +92,7 @@ int runtime_tick(void);
 
 int  efex_suspend_flag = 0;
 int efex_ubi_init_flag;
+static int usb_debug_mode = -1;
 
 DECLARE_GLOBAL_DATA_PTR;
 /*
@@ -773,8 +774,9 @@ static void __sunxi_usb_efex_fill_status(void)
 int sunxi_print_usb_efex_cmd(u8 *cmd_buffer)
 {
 	struct global_cmd_s  *cmd = (struct global_cmd_s *)cmd_buffer;
-	int usb_debug_mode = 0;
-	script_parser_fetch("/soc/platform", "usb_debug_mode", &usb_debug_mode, 0);
+	if (usb_debug_mode < 0)
+		script_parser_fetch("/soc/platform", "usb_debug_mode",
+				    &usb_debug_mode, 0);
 	if (usb_debug_mode) {
 		printf("\t app_cmd: ");
 		switch (cmd->app_cmd) {
@@ -860,8 +862,9 @@ int sunxi_print_usb_efex_cmd(u8 *cmd_buffer)
 
 int sunxi_print_usb_efex_next_status(int app_next_status)
 {
-	int usb_debug_mode = 0;
-	script_parser_fetch("/soc/platform", "usb_debug_mode", &usb_debug_mode, 0);
+	if (usb_debug_mode < 0)
+		script_parser_fetch("/soc/platform", "usb_debug_mode",
+				    &usb_debug_mode, 0);
 	if (usb_debug_mode) {
 		printf("\t app_next_status: ");
 		switch (app_next_status) {
@@ -1502,6 +1505,15 @@ static int __sunxi_usb_efex_op_cmd(u8 *cmd_buffer)
         case FEX_CMD_fes_force_erase_key:
             printf("FEX_CMD_fes_force_erase_key \n");
             {
+#ifdef CONFIG_SUNXI_UBIFS
+		if ((get_boot_storage_type() == STORAGE_NAND) &&
+					efex_ubi_init_flag == 0 &&
+					nand_use_ubi()) {
+			ubi_nand_probe_uboot();
+			ubi_nand_attach_mtd();
+			efex_ubi_init_flag = 1;
+		}
+#endif
 		    trans_data.last_err = sunxi_sprite_force_erase_key();
 		    printf("FEX_CMD_fes_force_erase_key last err = %d \n",
 			   trans_data.last_err);
@@ -1781,8 +1793,9 @@ void sunxi_print_efex_status(int efex_status)
 {
 	static int temp_efex_status = -1;
 	static int cnt;
-	int usb_debug_mode = 0;
-	script_parser_fetch("/soc/platform", "usb_debug_mode", &usb_debug_mode, 0);
+	if (usb_debug_mode < 0)
+		script_parser_fetch("/soc/platform", "usb_debug_mode",
+				    &usb_debug_mode, 0);
 	if (usb_debug_mode) {
 		if (temp_efex_status != efex_status || cnt < 5) {
 			if (efex_status == SUNXI_USB_EFEX_IDLE) {
@@ -1831,8 +1844,9 @@ void sunxi_print_efex_status(int efex_status)
 void sunxi_print_efex_app_step(int efex_app_status)
 {
 	static int temp_efex_status = -1;
-	int usb_debug_mode = 0;
-	script_parser_fetch("/soc/platform", "usb_debug_mode", &usb_debug_mode, 0);
+	if (usb_debug_mode < 0)
+		script_parser_fetch("/soc/platform", "usb_debug_mode",
+				    &usb_debug_mode, 0);
 	if (usb_debug_mode) {
 		if (temp_efex_status != efex_app_status) {
 			printf("\t sunxi_usb_efex_app_step: ");

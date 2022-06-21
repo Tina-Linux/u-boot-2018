@@ -10,7 +10,9 @@
 #include <asm/arch/timer.h>
 #include <asm/arch/gic.h>
 #include <div64.h>
-
+#if defined(CONFIG_MACH_SUN50IW12)
+#include <asm/arch/clock.h>
+#endif
 DECLARE_GLOBAL_DATA_PTR;
 
 #define TIMER_MODE   (0x0 << 7)	/* continuous mode */
@@ -42,7 +44,7 @@ int timer_init(void)
 	writel(TIMER_MODE | TIMER_DIV | TIMER_SRC | TIMER_RELOAD | TIMER_EN,
 	       &timer->ctl);
 #endif
-	
+
 	timers->tirqen  = 0;
 	timers->tirqsta |= 0x03;
 
@@ -126,7 +128,7 @@ void __udelay(unsigned long usec)
 * 64bit arch timer.CNTPCT
 * Freq = 24000000Hz
 */
-static inline u64 read_timer(void)
+u64 read_timer(void)
 {
 	u32 low=0, high = 0;
 	asm volatile("mrrc p15, 0, %0, %1, c14"
@@ -219,6 +221,8 @@ ulong get_tbclk(void)
 	return CONFIG_SYS_HZ;
 }
 
+
+#if !(CONFIG_MACH_SUN8IW11)
 void watchdog_disable(void)
 {
 	struct sunxi_timer_reg *timers = (struct sunxi_timer_reg *)SUNXI_TIMER_BASE;
@@ -236,6 +240,31 @@ void watchdog_enable(void)
 
 	return ;
 }
+
+#else
+
+void watchdog_disable(void)
+{
+	struct sunxi_timer_reg *timer_reg =
+		(struct sunxi_timer_reg *)SUNXI_TIMER_BASE;
+	struct sunxi_wdog *wdog = &timer_reg->wdog[0];
+	/* disable watchdog */
+	writel(0, &(wdog->mode));
+
+	return;
+}
+
+void watchdog_enable(void)
+{
+	struct sunxi_timer_reg *timer_reg =
+		(struct sunxi_timer_reg *)SUNXI_TIMER_BASE;
+	struct sunxi_wdog *wdog = &timer_reg->wdog[0];
+	/* enable watchdog */
+	wdog->mode |= 3;
+
+	return;
+}
+#endif
 
 static  int  timer_used_status;
 
@@ -331,6 +360,9 @@ void add_timer(struct timer_list *timer)
 		printf("timer err: there is no timer cound be used\n");
 		return ;
 	}
+#if defined(CONFIG_MACH_SUN50IW12)
+	clock_open_timer(timer_num);
+#endif
 	timer->timer_num = timer_num;
 	timer_reg      =   (struct sunxi_timer_reg *)SUNXI_TIMER_BASE;
 	timer_tcontrol = &((struct sunxi_timer_reg *)SUNXI_TIMER_BASE)->timer[timer_num];
@@ -385,6 +417,9 @@ void del_timer(struct timer_list *timer)
 	timer_reg      =   (struct sunxi_timer_reg *)SUNXI_TIMER_BASE;
 	timer_tcontrol = &((struct sunxi_timer_reg *)SUNXI_TIMER_BASE)->timer[num];
 
+#if defined(CONFIG_MACH_SUN50IW12)
+	clock_open_timer(num);
+#endif
 	irq_disable(AW_IRQ_TIMER0 + num);
 	timer_tcontrol->ctl &= ~1;
 	timer_reg->tirqsta = (1<<num);
@@ -396,4 +431,3 @@ void del_timer(struct timer_list *timer)
 
 	return ;
 }
-

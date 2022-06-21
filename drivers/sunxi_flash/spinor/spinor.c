@@ -23,7 +23,8 @@
 #include <asm/io.h>
 
 #include "../flash_interface.h"
-
+#include "../../mtd/spi/sf_internal.h"
+#include "../../spi/spi-sunxi.h"
 
 static struct spi_flash *flash;
 
@@ -416,12 +417,17 @@ static int
 sunxi_flash_spinor_download_spl(unsigned char *buffer, int len, unsigned int ext)
 {
 	u8 read_cmd = flash->read_opcode;
+	struct sunxi_spi_slave *sspi = get_sspi();
+	boot_spinor_info_t *boot_info;
 
 	debug("%s read cmd: 0x%x\n",__func__, read_cmd);
 	if(gd->bootfile_mode  == SUNXI_BOOT_FILE_NORMAL
 		 || gd->bootfile_mode  == SUNXI_BOOT_FILE_PKG) {
 
 		boot0_file_head_t    *boot0  = (boot0_file_head_t *)buffer;
+		boot_info = (boot_spinor_info_t *)boot0->prvt_head.storage_data;
+		boot_info->sample_delay = sspi->right_sample_delay;
+		boot_info->sample_mode = sspi->right_sample_mode;
 
 		/* set read cmd for boot0: single/dual/quad */
 		boot0->prvt_head.storage_data[0] = read_cmd;
@@ -438,6 +444,10 @@ sunxi_flash_spinor_download_spl(unsigned char *buffer, int len, unsigned int ext
 		sbrom_toc0_config_t  *toc0_config = NULL;
 
 		toc0_config = (sbrom_toc0_config_t *)(buffer + 0x80);
+		boot_info = (boot_spinor_info_t *)toc0_config->storage_data;
+		boot_info->sample_delay = sspi->right_sample_delay;
+		boot_info->sample_mode = sspi->right_sample_mode;
+
 		toc0_config->storage_data[0] = read_cmd;
 		toc0->check_sum = sunxi_sprite_generate_checksum(buffer,
 			toc0->length, toc0->check_sum);

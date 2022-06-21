@@ -22,7 +22,7 @@ struct sunxi_ccm_reg {
 	u8 reserved_0x034[12];
 	u32 pll3_cfg;		/* 0x040 pll3 (video0) control */
 	u8 reserved_0x044[4];
-	u32 pll_video1_cfg;	/* 0x048 pll video1 control */
+	u32 pll_csi_cfg;	/* 0x048 pll csi control */
 	u8 reserved_0x04c[12];
 	u32 pll4_cfg;		/* 0x058 pll4 (ve) control */
 	u8 reserved_0x05c[4];
@@ -41,8 +41,8 @@ struct sunxi_ccm_reg {
 	u8 reserved_0x138[8];
 	u32 pll3_pat0;		/* 0x140 pll3 (video0) pattern0 */
 	u32 pll3_pat1;		/* 0x144 pll3 (video0) pattern1 */
-	u32 pll_video1_pat0;	/* 0x148 pll video1 pattern0 */
-	u32 pll_video1_pat1;	/* 0x14c pll video1 pattern1 */
+	u32 pll_csi_pat0;	/* 0x148 pll csi pattern0 */
+	u32 pll_csi_pat1;	/* 0x14c pll csi pattern1 */
 	u8 reserved_0x150[8];
 	u32 pll4_pat0;		/* 0x158 pll4 (ve) pattern0 */
 	u32 pll4_pat1;		/* 0x15c pll4 (ve) pattern1 */
@@ -66,7 +66,7 @@ struct sunxi_ccm_reg {
 	u8 reserved_0x334[12];
 	u32 pll3_bias;		/* 0x340 pll3 (video0) bias */
 	u8 reserved_0x344[4];
-	u32 pll_video1_bias;	/* 0x348 pll video1 bias */
+	u32 pll_csi_bias;	/* 0x348 pll video1 bias */
 	u8 reserved_0x34c[12];
 	u32 pll4_bias;		/* 0x358 pll4 (ve) bias */
 	u8 reserved_0x35c[4];
@@ -83,8 +83,8 @@ struct sunxi_ccm_reg {
 	u32 psi_ahb1_ahb2_cfg;	/* 0x510 PSI/AHB1/AHB2 clock control */
 	u8 reserved_0x514[8];
 	u32 ahb3_cfg;		/* 0x51c AHB3 clock control */
-	u32 apb1_cfg;		/* 0x520 APB1 clock control */
-	u32 apb2_cfg;		/* 0x524 APB2 clock control */
+	u32 apb0_cfg;		/* 0x520 APB0 clock control */
+	u32 apb1_cfg;		/* 0x524 APB1 clock control */
 	u8 reserved_0x528[24];
 	u32 mbus_cfg;		/* 0x540 MBUS clock control */
 	u8 reserved_0x544[188];
@@ -191,7 +191,7 @@ struct sunxi_ccm_reg {
 	u32 pcie_ref_clk_cfg;	/* 0xab0 PCIE REF clock control */
 	u32 pcie_axi_clk_cfg;	/* 0xab4 PCIE AXI clock control */
 	u32 pcie_aux_clk_cfg;	/* 0xab8 PCIE AUX clock control */
-	u32 pcie_gate_reset;	/* 0xabc PCIE gate/reset control */
+	u32 dpss_top_bgr;	/* 0xabc DPSS TOP BUS Gating Reset */
 	u8 reserved_0xac0[64];
 	u32 hdmi_clk_cfg;	/* 0xb00 HDMI clock control */
 	u32 hdmi_slow_clk_cfg;	/* 0xb04 HDMI slow clock control */
@@ -219,7 +219,7 @@ struct sunxi_ccm_reg {
 	u32 hdcp_gate_reset;	/* 0xc4c HDCP gate/reset control */
 	u8 reserved_0xc50[688];
 	u32 ccu_sec_switch;	/* 0xf00 CCU security switch */
-	u32 pll_lock_dbg_ctrl;	/* 0xf04 PLL lock debugging control */
+	u32 gpadc_clk_sel;	/* 0xf04 PLL lock debugging control */
 };
 
 /* pll1 bit field */
@@ -227,7 +227,6 @@ struct sunxi_ccm_reg {
 #define CCM_PLL1_LOCK_EN		BIT(29)
 #define CCM_PLL1_LOCK			BIT(28)
 #define CCM_PLL1_CLOCK_TIME_2		(2 << 24)
-#define CCM_PLL1_CTRL_P(p)		((p) << 16)
 #define CCM_PLL1_CTRL_N(n)		((n) << 8)
 
 /* pll5 bit field */
@@ -244,49 +243,19 @@ struct sunxi_ccm_reg {
 #define CCM_PLL6_LOCK			BIT(28)
 #define CCM_PLL6_CTRL_N_SHIFT		8
 #define CCM_PLL6_CTRL_N_MASK		(0xff << CCM_PLL6_CTRL_N_SHIFT)
-#define CCM_PLL6_CTRL_DIV1_SHIFT	0
-#define CCM_PLL6_CTRL_DIV1_MASK		(0x1 << CCM_PLL6_CTRL_DIV1_SHIFT)
 #define CCM_PLL6_CTRL_DIV2_SHIFT	1
 #define CCM_PLL6_CTRL_DIV2_MASK		(0x1 << CCM_PLL6_CTRL_DIV2_SHIFT)
-#define CCM_PLL6_DEFAULT		0xa0006300
+#define CCM_PLL6_DEFAULT		0x48216310
 
 /* cpu_axi bit field*/
 #define CCM_CPU_AXI_MUX_MASK		(0x3 << 24)
-#define CCM_CPU_AXI_MUX_OSC24M		(0x0 << 24)
 #define CCM_CPU_AXI_MUX_PLL_CPUX	(0x3 << 24)
 
-/* psi_ahb1_ahb2 bit field */
-#define CCM_PSI_AHB1_AHB2_DEFAULT	0x03000102
-
-/* ahb3 bit field */
-#define CCM_AHB3_DEFAULT		0x03000002
+/* ahb0 bit field */
+#define CCM_AHB3_DEFAULT		0x00000000
 
 /* apb1 bit field */
-#define CCM_APB1_DEFAULT		0x03000102
-
-/* apb2 bit field */
-#define APB2_CLK_SRC_OSC24M		(0x0 << 24)
-#define APB2_CLK_SRC_OSC32K		(0x1 << 24)
-#define APB2_CLK_SRC_PSI		(0x2 << 24)
-#define APB2_CLK_SRC_PLL6		(0x3 << 24)
-#define APB2_CLK_SRC_MASK		(0x3 << 24)
-#define APB2_CLK_RATE_N_1		(0x0 << 8)
-#define APB2_CLK_RATE_N_2		(0x1 << 8)
-#define APB2_CLK_RATE_N_4		(0x2 << 8)
-#define APB2_CLK_RATE_N_8		(0x3 << 8)
-#define APB2_CLK_RATE_N_MASK		(3 << 8)
-#define APB2_CLK_RATE_M(m)		(((m)-1) << 0)
-#define APB2_CLK_RATE_M_MASK            (3 << 0)
-
-/* MBUS clock bit field */
-#define MBUS_ENABLE			BIT(31)
-#define MBUS_RESET			BIT(30)
-#define MBUS_CLK_SRC_MASK		GENMASK(25, 24)
-#define MBUS_CLK_SRC_OSCM24		(0 << 24)
-#define MBUS_CLK_SRC_PLL6X2		(1 << 24)
-#define MBUS_CLK_SRC_PLL5		(2 << 24)
-#define MBUS_CLK_SRC_PLL6X4		(3 << 24)
-#define MBUS_CLK_M(m)			(((m)-1) << 0)
+#define CCM_APB1_DEFAULT		0x00000100
 
 /* Module gate/reset shift*/
 #define RESET_SHIFT			(16)
@@ -304,17 +273,17 @@ struct sunxi_ccm_reg {
 #define CCM_MMC_CTRL_SCLK_DLY(a)	((void) (a), 0)
 
 /*CE*/
-#define CE_CLK_SRC_MASK                   (0x1)
+#define CE_CLK_SRC_MASK                   (0x7)
 #define CE_CLK_SRC_SEL_BIT                (24)
-#define CE_CLK_SRC                        (0x01)
+#define CE_CLK_SRC                        (0x02)
 
-#define CE_CLK_DIV_RATION_N_BIT           (8)
-#define CE_CLK_DIV_RATION_N_MASK          (0x3)
+#define CE_CLK_DIV_RATION_N_BIT           (0)
+#define CE_CLK_DIV_RATION_N_MASK          (0)
 #define CE_CLK_DIV_RATION_N               (0)
 
 #define CE_CLK_DIV_RATION_M_BIT           (0)
 #define CE_CLK_DIV_RATION_M_MASK          (0xF)
-#define CE_CLK_DIV_RATION_M               (3)
+#define CE_CLK_DIV_RATION_M               (0)
 
 #define CE_SCLK_ONOFF_BIT                 (31)
 #define CE_SCLK_ON                        (1)

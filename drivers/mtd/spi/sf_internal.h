@@ -99,4 +99,19 @@ int spi_flash_cmd_get_sw_write_prot(struct spi_flash *flash);
 int spi_flash_mtd_register(struct spi_flash *flash);
 void spi_flash_mtd_unregister(void);
 #endif
+
+
+typedef struct {
+	__s32	readcmd;
+	__s32	read_mode;
+	__s32	write_mode;
+	__s32	flash_size;
+	__s32	erase_size;
+	__s32	delay_cycle;/*When the frequency is greater than 60MHZ configured as 1;less than 24MHZ configured as 2;greater 24MHZ and less 60HZ as 3*/
+	__s32	lock_flag;
+	__s32	frequency;
+	unsigned int sample_delay;
+	unsigned int sample_mode;
+} boot_spinor_info_t;
+
 #endif /* _SF_INTERNAL_H_ */

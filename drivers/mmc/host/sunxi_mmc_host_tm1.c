@@ -238,14 +238,11 @@ static int mmc_set_mod_clk(struct sunxi_mmc_priv *priv, unsigned int hz)
 		pll = CCM_MMC_CTRL_OSCM24;
 		pll_hz = 24000000;
 	} else {
-#if (!defined (CONFIG_MACH_SUN8IW7))
-		pll = CCM_MMC_CTRL_PLL6X2;
-		pll_hz = clock_get_pll6() * 2 *1000000;
-#else
-		pll = CCM_MMC_CTRL_PLL6;
-		pll_hz = clock_get_pll6() * 1000000;
-#endif
+		pll = sunxi_mmc_get_src_clk_no(priv->mmc_no, mod_hz, 1);
+		pll_hz = sunxi_host_src_clk(priv->mmc_no, (pll>>24), 1);
 	}
+
+	MMCDBG("pll config :%d : %d\n", pll, pll_hz);
 
 	div = pll_hz / mod_hz;
 	if (pll_hz % mod_hz)

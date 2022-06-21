@@ -47,8 +47,17 @@
 #define SHA1_160_MODE 0
 #define SHA2_256_MODE 1
 
-#define ALG_SHA256 (0x13)
-#define ALG_RSA	   (0x20)
+/*alg type*/
+#define ALG_AES		(0x0)
+#define ALG_SM4		(0x3)
+#define ALG_SHA256	(0x13)
+#define ALG_SHA512	(0x15)
+#define ALG_RSA		(0x20)
+#define ALG_ECC		(0x21)
+#define ALG_SM2		(0x22)
+#define ALG_MD5		(0x10)
+#define ALG_TRANG	(0x1C)
+
 
 /*ctrl
 */
@@ -67,6 +76,13 @@
 #define SUNXI_SM3    (6)
 
 #define SUNXI_TRNG   (2)
+
+/*sm2 mode*/
+#define SM2_MODE_ENC			(0)
+#define SM2_MODE_DEC			(1)
+#define SM2_MODE_SIGN			(2)
+#define SM2_MODE_VERIFY			(3)
+#define SM2_MODE_KEY_EXCHANGE	(4)
 
 /*cmd
 */

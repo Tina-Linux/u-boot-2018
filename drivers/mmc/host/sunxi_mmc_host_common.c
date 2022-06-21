@@ -406,15 +406,16 @@ static void mmc_get_para_from_fex(int sdc_no)
 				MMCDBG("card0 try use io 3V.\n");
 			}
 		}
-		ret = sunxi_auto_pow_mode(5);
-		if (!ret)
-			cfg->io_is_1v8 = 0;
 
 		pin_default->pin_count = fdt_get_all_pin(nodeoffset, "pinctrl-0", pin_default->pin_set);
 			if (pin_default->pin_count <= 0) {
 				MMCINFO("get card0 default pin fail\n");
 				return ;
 		}
+
+		ret = sunxi_auto_pow_mode(pin_default->pin_set[0].port-1);
+		if (!ret)
+			cfg->io_is_1v8 = 0;
 
 		/*avoid the error print from fdt_get_all_pin*/
 		pin_disable->pin_count = fdt_getprop_u32(working_fdt, nodeoffset, "pinctrl-1", handle);
@@ -748,15 +749,15 @@ static void mmc_get_para_from_fex(int sdc_no)
 			}
 		}
 
-		ret = sunxi_auto_pow_mode(2);
-		if (!ret)
-			cfg->io_is_1v8 = 0;
-
 		pin_default->pin_count = fdt_get_all_pin(nodeoffset, "pinctrl-0", pin_default->pin_set);
 		if (pin_default->pin_count <= 0) {
 			MMCDBG("get card2 default pin fail\n");
 			return ;
 		}
+
+		ret = sunxi_auto_pow_mode(pin_default->pin_set[0].port-1);
+		if (!ret)
+			cfg->io_is_1v8 = 0;
 
 		/*avoid the error print from fdt_get_all_pin*/
 		pin_disable->pin_count = fdt_getprop_u32(working_fdt, nodeoffset, "pinctrl-1", handle);
@@ -1175,4 +1176,63 @@ int sunxi_host_mmc_config(int sdc_no)
 	}
 ERR:
 	return ret;
+}
+
+int __attribute__((weak)) sunxi_mmc_get_src_clk_no(int sdc_no, int mod_hz, int tm) {
+	unsigned int pll = CCM_MMC_CTRL_PLL6X2;
+
+	if (tm == 4 || tm ==5) {
+#ifdef CCM_MMC2_CTRL_PLL6X2
+		pll = CCM_MMC2_CTRL_PLL6X2;
+#elif CCM_MMC_CTRL_PLL6X2
+		pll = CCM_MMC_CTRL_PLL6X2;
+#else
+		MMCINFO("There is no 2X pll!\n");
+		return -1;
+#endif
+	} else if (tm == 1) {
+#if (!(defined(CONFIG_MACH_SUN8IW7) || defined(CONFIG_MACH_SUN8IW11)))
+		pll = CCM_MMC_CTRL_PLL6X2;
+#else
+		pll = CCM_MMC_CTRL_PLL6;
+#endif
+	} else if (tm == 0) {
+#ifdef CCM_MMC_CTRL_PLL6
+		pll = CCM_MMC_CTRL_PLL6;
+#else
+		MMCINFO("There is no 1X pll!\n");
+		return -1;
+#endif
+
+	}
+
+	return pll;
+}
+
+int __attribute__((weak)) sunxi_host_src_clk(int sdc_no, int src_clk, int tm) {
+	unsigned int pll_hz = clock_get_pll6() * 2 *1000000;
+	if (tm == 1) {
+#if (!(defined(CONFIG_MACH_SUN8IW7) || defined(CONFIG_MACH_SUN8IW11)))
+		pll_hz = clock_get_pll6() * 2 *1000000;
+#else
+		pll_hz = clock_get_pll6() * 1000000;
+#endif
+	} else if (tm == 5 || tm == 4) {
+#ifdef CCM_MMC2_CTRL_PLL6X2
+		pll_hz = clock_get_pll6() * 2 *1000000;
+#elif CCM_MMC_CTRL_PLL6X2
+		pll_hz = clock_get_pll6() * 2 *1000000;
+#else
+		MMCINFO("There is no 2X pll!\n");
+		return -1;
+#endif
+	} else if (tm == 0) {
+#ifdef CCM_MMC_CTRL_PLL6
+		pll_hz = clock_get_pll6() * 1000000;
+#else
+		MMCINFO("There is no 1X pll!\n");
+		return -1;
+#endif
+	}
+	return pll_hz;
 }

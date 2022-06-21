@@ -9,7 +9,7 @@
 #include "rawnand_chip.h"
 #include "controller/ndfc_ops.h"
 #include "controller/ndfc_timings.h"
-#include "rawnand.h"
+/*#include "rawnand.h"*/
 #include "rawnand_base.h"
 #include "rawnand_ids.h"
 #include "rawnand_readretry.h"
@@ -17,6 +17,8 @@
 #include "rawnand_boot.h"
 #include "../../nand_osal_uboot.h"
 #include <private_toc.h>
+#include <sunxi_nand_boot.h>
+#include <sunxi_nand_errno.h>
 
 /*int small_nand_seed; //small nand random seed flag*/
 static __u32 SECURE_FLAG;

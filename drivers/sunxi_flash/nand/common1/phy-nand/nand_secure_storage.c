@@ -10,10 +10,12 @@
 #include "rawnand/rawnand_debug.h"
 #include "../nand_osal_uboot.h"
 #include <asm/byteorder.h>
+#include <sunxi_nand_boot.h>
 
 /*#define CHECK_BACKFILL*/
 
 
+extern int get_default_uboot_block(unsigned int *start_block, unsigned int *next_block);
 #define ITEM_LEN 4096
 
 #pragma pack(1)
@@ -57,10 +59,12 @@ int nand_secure_storage_backfill(void);
 
 unsigned int nand_get_secure_block_start(void)
 {
-	int block_start;
+	unsigned int uboot_start_block = 0;
+	unsigned int uboot_next_block = 0;
 
-	block_start = aw_nand_info.boot->uboot_next_block;
-	return block_start;
+	get_default_uboot_block(&uboot_start_block, &uboot_next_block);
+
+	return uboot_next_block;
 }
 
 /*****************************************************************************
@@ -230,6 +234,7 @@ int is_nand_secure_storage_block(unsigned int block)
 	ret = nand_physic_read_page(0, block, 0, 0, NULL, spare);
 	if (ret != 0)
 		pr_err("read b@%d p@0 fail\n", block);
+
 
 	if ((spare[0] == 0xff) && (spare[1] == 0xaa) && (spare[2] == 0x5c)) {
 
@@ -444,10 +449,8 @@ int nand_secure_storage_first_build(unsigned int start_block)
 			break;
 		}
 	}
-	printf("%s gs.blockA:%u\n", __func__, gs.blockA);
-	printf("%s gs.blockB:%u\n", __func__, gs.blockB);
-	printf("%s gs.blockA_init:%u\n", __func__, gs.blockA_init);
-	printf("%s gs.blockB_init:%u\n", __func__, gs.blockB_init);
+	pr_info("%s gs.blockA:%u-%d\n", __func__, gs.blockA, nand_secure_storage_block);
+	pr_info("%s gs.blockB:%u-%d\n", __func__, gs.blockB, nand_secure_storage_block_bak);
 
 	if (!gs.blockA_init)
 		nand_secure_storage_write_init(gs.blockA);
@@ -468,6 +471,7 @@ int nand_secure_storage_first_build(unsigned int start_block)
 		pr_debug("nand secure storage firsr build  ok: %d,%d\n",
 			    nand_secure_storage_block,
 			    nand_secure_storage_block_bak);
+		ubootsta.nand_secstate.state = SECURE_STORAGE_FIRST_BUILD;
 	}
 	return block;
 }
@@ -533,6 +537,7 @@ int nand_secure_storage_read_one(unsigned int block, int item,
 		memset(spare, 0, 64);
 		nand_physic_read_page(0, block, item, page_size / 512, mbuf,
 				      spare);
+
 		if ((spare[1] != 0xaa) || (spare[2] != 0x5c)) {
 			continue;
 		}
@@ -845,11 +850,13 @@ int nand_secure_storage_fast_write(int item, unsigned char *buf,
 			memset(gs.pages[i], 0, page_size);
 		}
 
+		pr_info("%s-%d A:%d B:%d\n", __func__, __LINE__,
+				nand_secure_storage_block, nand_secure_storage_block_bak);
 		for (i = 0; i < MAX_SECURE_STORAGE_ITEM * pages_cnt_per_item; i++) {
 			nand_secure_storage_read_one_pre(nand_secure_storage_block,
 					i, gs.pages[i], len, gs.oobs[i], pages_cnt_per_item);
 			/*not valid item*/
-			if (gs.pages_right[i] != 0) {
+			if (gs.pages_right[i] != 0 && gs.pages_right[i] != 1) {
 				nand_secure_storage_read_one_pre(
 						nand_secure_storage_block_bak, i, gs.pages[i], len, gs.oobs[i], pages_cnt_per_item);
 			}

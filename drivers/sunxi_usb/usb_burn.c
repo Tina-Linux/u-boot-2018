@@ -719,6 +719,7 @@ int __sunxi_read_key_by_name(void *buffer, uint buff_len, int *read_len)
 		}
 
 		/* convert hex key to char,so that dragonkey tool can display it */
+		key_info->len = key_data_len*2;
 		hex2char((void *)(key_info->key_data), (void *)(data_buff), key_data_len);
 		*read_len +=key_data_len*2;
 		return 0;

@@ -44,9 +44,8 @@ int cpus_clk_maxreg = CPUS_CLK_MAX_REG;
 /*                                ns  nw  ks  kw  ms  mw  ps  pw  d1s d1w d2s d2w {frac   out mode}   en-s    sdmss   sdmsw   sdmpat          sdmval*/
 SUNXI_CLK_FACTORS(pll_cpu,        8,  8,  0,  0,  0,  2,  16, 2,  0,  0,  0,  0,    0,    0,  0,      31,     0,      0,      0,              0);
 SUNXI_CLK_FACTORS(pll_ddr0,       8,  8,  0,  0,  0,  0,  0,  0,  1,  1,  0,  1,    0,    0,  0,      31,     24,     1,      PLL_DDR0PAT,    0xd1303333);
-SUNXI_CLK_FACTORS(pll_periph0,    8,  8,  0,  0,  0,  0,  0,  0,  1,  1,  0,  1,    0,    0,  0,      31,     0,      0,      PLL_PERI0PAT0,  0xd1303333);
-SUNXI_CLK_FACTORS(pll_periph0x2,    8,  8,  0,  0,  0,  0,  0,  0,  1,  1,  0,  1,    0,    0,  0,      31,     0,      0,      PLL_PERI0PAT0,  0xd1303333);
-SUNXI_CLK_FACTORS(pll_uni,        8,  8,  0,  0,  0,  0,  0,  0,  1,  1,  0,  1,    0,    0,  0,      31,     24,     1,      PLL_UNIPAT0,    0xd1303333);
+SUNXI_CLK_FACTORS(pll_periph0,    8,  8,  0,  0,  1,  1,  16, 3,  0,  0,  0,  0,    0,    0,  0,      31,     0,      0,      PLL_PERI0PAT0,  0xd1303333);
+SUNXI_CLK_FACTORS(pll_periph0x2,  8,  8,  0,  0,  1,  1,  16, 3,  0,  0,  0,  0,    0,    0,  0,      31,     0,      0,      PLL_PERI0PAT0,  0xd1303333);
 SUNXI_CLK_FACTORS(pll_video0,     8,  8,  0,  0,  0,  0,  0,  0,  1,  1,  0,  0,    0,    0,  0,      31,     0,      0,      PLL_VIDEO0PAT0, 0xd1303333);
 SUNXI_CLK_FACTORS(pll_video0x4,   8,  8,  0,  0,  0,  0,  0,  0,  1,  1,  0,  0,    0,    0,  0,      31,     0,      0,      PLL_VIDEO0PAT0, 0xd1303333);
 SUNXI_CLK_FACTORS(pll_video1,     8,  8,  0,  0,  0,  0,  0,  0,  1,  1,  0,  0,    0,    0,  0,      31,     0,      0,      PLL_VIDEO0PAT1, 0xd1303333);
@@ -96,25 +95,6 @@ static int get_factors_pll_ddr0(u32 rate, u32 parent_rate,
 
 
 static int get_factors_pll_periph0(u32 rate, u32 parent_rate,
-		struct clk_factors_value *factor)
-{
-	int index;
-	u64 tmp_rate;
-
-	if (!factor)
-		return -1;
-
-	tmp_rate = rate > pllperiph0_max ? pllperiph0_max : rate;
-	do_div(tmp_rate, 1000000);
-	index = tmp_rate;
-
-	if (FACTOR_SEARCH(periph0))
-		return -1;
-
-	return 0;
-}
-
-static int get_factors_pll_uni(u32 rate, u32 parent_rate,
 		struct clk_factors_value *factor)
 {
 	int index;
@@ -237,7 +217,19 @@ static unsigned long calc_rate_pll_periph(u32 parent_rate,
 	u64 tmp_rate = (parent_rate ? parent_rate : 24000000);
 
 	tmp_rate = tmp_rate * (factor->factorn + 1);
-	do_div(tmp_rate, 2 * (factor->factord1 + 1) * (factor->factord2 + 1));
+	do_div(tmp_rate, 2 * (factor->factorm + 1) * (factor->factorp + 1));
+
+	return (unsigned long)tmp_rate;
+}
+
+static unsigned long calc_rate_pll_periph0x2(u32 parent_rate,
+		struct clk_factors_value *factor)
+{
+	u64 tmp_rate = (parent_rate ? parent_rate : 24000000);
+
+	tmp_rate = tmp_rate * (factor->factorn + 1);
+	do_div(tmp_rate, (factor->factorm + 1) * (factor->factorp + 1));
+
 	return (unsigned long)tmp_rate;
 }
 
@@ -323,8 +315,7 @@ struct factor_init_data sunxi_factos[] = {
 	{"pll_cpu",     hosc_parents, 1,          CLK_GET_RATE_NOCACHE|CLK_NO_DISABLE, PLL_CPU,     PLL_CPU,     LOCKBIT(28), PLL_CPU,     29,          PLL_LOCK_NEW_MODE, &sunxi_clk_factor_pll_cpu,     &get_factors_pll_cpu,     &calc_rate_pll_cpu,    (struct clk_ops *)NULL},
 	{"pll_ddr0",    hosc_parents, 1,          CLK_GET_RATE_NOCACHE|CLK_NO_DISABLE, PLL_DDR0,    PLL_DDR0,    LOCKBIT(28), PLL_DDR0,    29,          PLL_LOCK_NEW_MODE, &sunxi_clk_factor_pll_ddr0,    &get_factors_pll_ddr0,    &calc_rate_pll_ddr,    (struct clk_ops *)NULL},
 	{"pll_periph0", hosc_parents, 1,          CLK_NO_DISABLE,         PLL_PERIPH0, PLL_PERIPH0, LOCKBIT(28), PLL_PERIPH0, 29,          PLL_LOCK_NEW_MODE, &sunxi_clk_factor_pll_periph0, &get_factors_pll_periph0, &calc_rate_pll_periph, (struct clk_ops *)NULL},
-	{"pll_periph0x2", hosc_parents, 1,          CLK_NO_DISABLE,         PLL_PERIPH0, PLL_PERIPH0, LOCKBIT(28), PLL_PERIPH0, 29,          PLL_LOCK_NEW_MODE, &sunxi_clk_factor_pll_periph0x2, &get_factors_pll_periph0, &calc_rate_pll_periph, (struct clk_ops *)NULL},
-	{"pll_uni",     hosc_parents, 1,          CLK_NO_DISABLE,         PLL_UNI, 	   PLL_UNI,     LOCKBIT(28), PLL_UNI,     29,          PLL_LOCK_NEW_MODE, &sunxi_clk_factor_pll_uni,     &get_factors_pll_uni,     &calc_rate_pll_periph, (struct clk_ops *)NULL},
+	{"pll_periph0x2", hosc_parents, 1,          CLK_NO_DISABLE,         PLL_PERIPH0, PLL_PERIPH0, LOCKBIT(28), PLL_PERIPH0, 29,          PLL_LOCK_NEW_MODE, &sunxi_clk_factor_pll_periph0x2, &get_factors_pll_periph0, &calc_rate_pll_periph0x2, (struct clk_ops *)NULL},
 	{"pll_video0",  hosc_parents, 1,          CLK_NO_DISABLE,         PLL_VIDEO0,  PLL_VIDEO0,  LOCKBIT(28), PLL_VIDEO0,  29,          PLL_LOCK_NEW_MODE, &sunxi_clk_factor_pll_video0,  &get_factors_pll_video0,  &calc_rate_video,      (struct clk_ops *)NULL},
 	{"pll_video0x4",  hosc_parents, 1,          CLK_NO_DISABLE,         PLL_VIDEO0,  PLL_VIDEO0,  LOCKBIT(28), PLL_VIDEO0,  29,          PLL_LOCK_NEW_MODE, &sunxi_clk_factor_pll_video0x4,  &get_factors_pll_video0,  &calc_rate_video,      (struct clk_ops *)NULL},
 	{"pll_video1",  hosc_parents, 1,          CLK_NO_DISABLE,         PLL_VIDEO1,  PLL_VIDEO1,  LOCKBIT(28), PLL_VIDEO1,  29,          PLL_LOCK_NEW_MODE, &sunxi_clk_factor_pll_video1,  &get_factors_pll_video1,  &calc_rate_video,      (struct clk_ops *)NULL},
@@ -356,7 +347,7 @@ static const char *ephy_25m_parents[] = {"pll_periph0div25m"};
 static const char *audio_parents[] = {"pll_audio", "pll_audiox2", "pll_audiox4"};
 static const char *usbohci_12m_parents[] = {"osc48md4", "hoscd2", "losc"};
 static const char *mipi_dphy_parents[] = {"pll_video0", "pll_video0x4"};
-static const char *mipi_host_parents[] = {"pll_periph0", "pll_periph0x2", "hosc"};
+static const char *mipi_host_parents[] = {"host", "pll_periph0", "pll_video0x2", "pll_video1x2", "pll_audio1div2"};
 static const char *tcon_lcd_parents[] = {"pll_video0", "pll_video0x4", "pll_video1", "pll_video1x4", "pll_periph0x2", "pll_audiox2", "", ""};
 static const char *tcon_tv_parents[] = {"pll_video0", "pll_video0x4", "pll_video1", "pll_video1x4", "pll_periph0x2", "pll_audiox2", "", ""};
 static const char *hdmi_cec_parents[] = {"losc", "periph32k", "", ""};
@@ -706,12 +697,10 @@ struct periph_init_data *sunxi_cpus_clk_get_periph_by_name(const char *name)
 void init_clocks(void)
 {
 	int i;
-	struct clk *clk;
 	struct factor_init_data *factor;
 	struct periph_init_data *periph;
-	int node;
-	u32 div, mult;
-tick_printf("line:%d %s\n", __LINE__, __func__);
+
+	tick_printf("line:%d %s\n", __LINE__, __func__);
 	/* get clk register base address */
 	sunxi_clk_base = (void *)SUNXI_CCM_BASE; // fixed base address.
 	sunxi_clk_cpus_base = (void *)SUNXI_PRCM_BASE;
@@ -734,30 +723,6 @@ tick_printf("line:%d %s\n", __LINE__, __func__);
 					   (struct factor_init_data *)factor);
 	}
 
-	node = fdt_path_offset(working_fdt, "/clocks/pll_periph0x2");
-	if (node < 0) {
-		printf("not find the node:/clocks/pll_periph0x2\n");
-		goto init_periph;
-	}
-
-	if (fdt_getprop_u32(working_fdt, node, "clock-div", &div) < 0) {
-		printf("get clock-div err\n");
-		goto init_periph;
-	}
-
-	if (fdt_getprop_u32(working_fdt, node, "clock-mult", &mult) < 0) {
-		printf("get clock-mult err\n");
-		goto init_periph;
-	}
-
-	clk = clk_register_fixed_factor(NULL, "pll_periph0x2", "pll_periph0",
-			0, mult, div);
-	if (!clk) {
-		printf("register fix_factor clk error\n");
-		goto init_periph;
-	}
-
-init_periph:
 	/* register periph clock */
 	for (i = 0; i < ARRAY_SIZE(sunxi_periphs_init); i++) {
 		periph = &sunxi_periphs_init[i];

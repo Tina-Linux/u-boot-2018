@@ -21,12 +21,12 @@
 #define SUNXI_USB_PHY_CTRL	0x810
 #define HOST_MAXNUM		5
 
-static u32 usb_vbase = SUNXI_EHCI0_BASE;
+static uintptr_t usb_vbase = SUNXI_EHCI0_BASE;
 unsigned int usb_drv_vbus_gpio = -1;
 
 typedef struct _ehci_config
 {
-	u32 ehci_base;
+	uintptr_t ehci_base;
 	u32 bus_soft_reset_ofs;
 	u32 bus_clk_gating_ofs;
 	u32 phy_reset_ofs;
@@ -65,7 +65,6 @@ ulong config_usb_pin(int index)
 
 	if (usb_drv_vbus_gpio == -1)
 		return 0;
-
 	/*usbc0 port:PB0<0><1><default><default>*/
 	/*usbc1 port:PB1<0><1><default><default>*/
 	sunxi_gpio_set_cfgpin(usb_drv_vbus_gpio, 0);
@@ -84,6 +83,7 @@ void sunxi_set_vbus(int onoff)
 {
 	if (usb_drv_vbus_gpio == -1)
 		return;
+
 	gpio_set_value(usb_drv_vbus_gpio, onoff);
 	return;
 }
@@ -206,21 +206,21 @@ u32 close_usb_clock(int index)
 void usb_passby(int index, u32 enable)
 {
 	unsigned long reg_value = 0;
-	u32 ehci_vbase = ehci_cfg[index].ehci_base;
+	uintptr_t ehci_vbase = ehci_cfg[index].ehci_base;
 
 	if(ehci_cfg[index].usb0_support)
 	{
 		/* the default mode of usb0 is OTG,so change it here. */
-		reg_value = readl(SUNXI_USBOTG_BASE + 0x420);
+		reg_value = readl((void *)(SUNXI_USBOTG_BASE + 0x420));
 		reg_value &= ~(0x01);
-		writel(reg_value, (SUNXI_USBOTG_BASE + 0x420));
+		writel(reg_value, (void *)(SUNXI_USBOTG_BASE + 0x420));
 	}
 
-	reg_value = readl(ehci_vbase + SUNXI_USB_PHY_CTRL);
+	reg_value = readl((void *)(ehci_vbase + SUNXI_USB_PHY_CTRL));
 	reg_value &= ~(0x01 << 3);
-	writel(reg_value, (ehci_vbase + SUNXI_USB_PHY_CTRL));
+	writel(reg_value, (void *)(ehci_vbase + SUNXI_USB_PHY_CTRL));
 
-	reg_value = readl(ehci_vbase + SUNXI_USB_CTRL);
+	reg_value = readl((void *)(ehci_vbase + SUNXI_USB_CTRL));
 	if (enable) {
 		reg_value |= (1 << 10);		/* AHB Master interface INCR8 enable */
 		reg_value |= (1 << 9);     	/* AHB Master interface burst type INCR4 enable */
@@ -232,7 +232,7 @@ void usb_passby(int index, u32 enable)
 		reg_value &= ~(1 << 8);     /* AHB Master interface INCRX align disable */
 		reg_value &= ~(1 << 0);     /* ULPI bypass disable */
 	}
-	writel(reg_value, (ehci_vbase + SUNXI_USB_CTRL));
+	writel(reg_value, (void *)(ehci_vbase + SUNXI_USB_CTRL));
 
 	return;
 }
@@ -277,7 +277,7 @@ int ehci_hcd_init(int index, enum usb_init_type init,
 		return -1;
 	}
 	*hccr = (struct ehci_hccr *)usb_vbase;
-	*hcor = (struct ehci_hcor *)((uint32_t) (*hccr) +
+	*hcor = (struct ehci_hcor *)((uintptr_t)(*hccr) +
 		HC_LENGTH(ehci_readl(&((*hccr)->cr_capbase))));
 
 	printf("sunxi %s init ok...\n", ehci_cfg[index].name);

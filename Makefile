@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: GPL-2.0+
-
+SHELL:=/bin/bash
 VERSION = 2018
 PATCHLEVEL = 05
 SUBLEVEL =
@@ -968,12 +968,28 @@ quiet_cmd_cfgcheck = CFGCHK  $2
 cmd_cfgcheck = $(srctree)/scripts/check-config.sh $2 \
 		$(srctree)/scripts/config_whitelist.txt $(srctree)
 
-BOARD_DTS_EXIST=$(shell if [ -f $(DTS_PATH)/$(LICHEE_IC)-$(LICHEE_BOARD)-board.dts ]; then echo yes; else echo no; fi;)
-DEVICE_BOARD_DTS_EXIST=$(shell if [ -f $(LICHEE_BOARD_CONFIG_DIR)/uboot-board.dts ]; then echo yes; else echo no; fi;)
+BOARD_DTS_NAME = $(LICHEE_IC)-$(LICHEE_BOARD)-board
+
+ifneq (x$(TARGET_BOARD), x)
+BOARD_DTS_NAME := $(TARGET_BOARD)
+LICHEE_TARGET_BOARD_EXIT=$(shell if [[ "$(TARGET_BOARD)" == *-board* ]]; then echo yes; else echo no; fi;)
+ifeq (x$(LICHEE_TARGET_BOARD_EXIT), xno)
+BOARD_DTS_NAME := $(BOARD_DTS_NAME)-board
+endif
+endif
+
+BOARD_DTS_EXIST = $(shell if [ -f $(DTS_PATH)/$(BOARD_DTS_NAME).dts ]; then echo yes; else echo no; fi;)
+
+DEVICE_BOARD_DTS_EXIST = $(shell if [ -f $(LICHEE_BOARD_CONFIG_DIR)/uboot-board.dts ]; then echo yes; else echo no; fi;)
+
 DTS_WARNNING_SKIP :=	-W no-unit_address_vs_reg \
 			-W no-unit_address_format \
 			-W no-simple_bus_reg \
 			-W no-pwms_property
+ifeq (x$(DEVICE_BOARD_DTS_EXIST), xyes)
+# add depend on external dts, make sure dts in uboot up to date
+dts/dt.dtb: $(LICHEE_BOARD_CONFIG_DIR)/uboot-board.dts
+endif
 
 all:		$(ALL-y) cfg
 ifeq ($(CONFIG_DM_I2C_COMPAT)$(CONFIG_SANDBOX),y)
@@ -992,11 +1008,12 @@ PHONY += dtbs
 dtbs: dts/dt.dtb
 	@:
 dts/dt.dtb: u-boot
+
 ifeq (x$(DEVICE_BOARD_DTS_EXIST), xyes)
 	@-cp -v $(LICHEE_BOARD_CONFIG_DIR)/uboot-board.dts $(DTS_PATH)/.board-uboot.dts
 else
 ifeq (x$(BOARD_DTS_EXIST),xyes)
-	@-cp -v $(DTS_PATH)/$(LICHEE_IC)-$(LICHEE_BOARD)-board.dts $(DTS_PATH)/.board-uboot.dts
+	@-cp -v $(DTS_PATH)/$(BOARD_DTS_NAME).dts $(DTS_PATH)/.board-uboot.dts
 else
 	@-cp -v $(DTS_PATH)/$(CONFIG_SYS_CONFIG_NAME)-common-board.dts $(DTS_PATH)/.board-uboot.dts
 endif
@@ -1512,7 +1529,16 @@ include/config/uboot.release: include/config/auto.conf FORCE
 # version.h and scripts_basic is processed / created.
 
 # Listed in dependency order
-PHONY += prepare archprepare prepare0 prepare1 prepare2 prepare3
+PHONY += prepare archprepare prepare0 prepare1 prepare2 prepare3 cfg
+
+CLEAN_FILES += board/sunxi/sunxi_challenge.c
+board/sunxi/sunxi_challenge.c:
+	@echo "  prepare sunxi_challenge..."
+	@dd if=/dev/urandom of=sunxi_challenge bs=128 count=1 > /dev/null 2>&1
+	@xxd -c 8 -i sunxi_challenge > board/sunxi/sunxi_challenge.c
+	@sed -i '/^unsigned/i __attribute__((__used__))' board/sunxi/sunxi_challenge.c
+	@rm sunxi_challenge
+prepare: board/sunxi/sunxi_challenge.c
 
 # prepare3 is used to check if we are building in a separate output directory,
 # and if so do:

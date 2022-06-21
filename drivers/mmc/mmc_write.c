@@ -183,7 +183,7 @@ static ulong mmc_write_blocks(struct mmc *mmc, lbaint_t start,
 	data.flags = MMC_DATA_WRITE;
 
 	if (mmc_send_cmd(mmc, &cmd, &data)) {
-		MMCINFO("mmc write failed\n");
+		MMCMSG(mmc, "mmc write failed\n");
 		return 0;
 	}
 

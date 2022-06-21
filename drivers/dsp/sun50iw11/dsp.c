@@ -32,6 +32,8 @@
 #include <sunxi_image_header.h>
 #endif
 
+#include <asm/arch-sunxi/efuse.h>
+
 #define ROUND_DOWN(a, b) ((a) & ~((b)-1))
 #define ROUND_UP(a,   b) (((a) + (b)-1) & ~((b)-1))
 
@@ -169,6 +171,10 @@ static int sun50iw11_codec_param_set(struct fdt_header *dtb_base, int nodeoffset
 	codec_param->mic_gain[3] = temp_val;
 	fdt_getprop_u32(dtb_base, nodeoffset, "mic5gain", &temp_val);
 	codec_param->mic_gain[4] = temp_val;
+	if (sunxi_efuse_get_soc_ver() == SUN50IW11P1_VERSION_C) {
+		fdt_getprop_u32(dtb_base, nodeoffset, "mic6gain", &temp_val);
+		codec_param->mic_gain[5] = temp_val;
+	}
 
 	fdt_getprop_u32(dtb_base, nodeoffset, "adcdrc_cfg", &temp_val);
 	codec_param->adcdrc_cfg = temp_val;
@@ -396,7 +402,7 @@ static int sun50iw11_audio_set(void *head_addr)
 		pr_err("phase dts node(%s) failed. ret: %d, val:0x%08x\n", \
 		_name, err, temp_val); \
 	} else { \
-		pr_err("phase %s: 0x%08x\n", _name, temp_val); \
+		pr_info("phase %s: 0x%08x\n", _name, temp_val); \
 	} } while (0);
 
 static int sun50iw11_standby_set(void *head_addr)
@@ -483,6 +489,43 @@ static int sun50iw11_print_version(void *head_addr)
 	return 0;
 }
 
+static int load_image_old(u32 img_addr, u32 *run_addr)
+{
+	Elf32_Ehdr *ehdr; /* Elf header structure pointer */
+	Elf32_Phdr *phdr; /* Program header structure pointer */
+	int i;
+
+	ehdr = (Elf32_Ehdr *)img_addr;
+	phdr = (Elf32_Phdr *)(img_addr + ehdr->e_phoff);
+
+	/* Load each program header */
+	for (i = 0; i < ehdr->e_phnum; ++i) {
+		void *dst = (void *)(uintptr_t)phdr->p_paddr;
+		void *src = (void *)img_addr + phdr->p_offset;
+
+		debug("Loading phdr %i to 0x%p (%i bytes)\n",
+		      i, dst, phdr->p_filesz);
+		if (phdr->p_filesz)
+			memcpy(dst, src, phdr->p_filesz);
+		if (phdr->p_filesz != phdr->p_memsz)
+			memset(dst + phdr->p_filesz, 0x00,
+			       phdr->p_memsz - phdr->p_filesz);
+#ifdef CONFIG_MACH_SUN50IW11
+		/* 50iw11 have header,we set it and simple check it */
+		if (phdr->p_memsz <= 0x400 && i == 0) {
+			sun50iw11_head_set(dst);
+			sun50iw11_print_version(dst);
+		}
+#endif /* CONFIG_MACH_SUN50IW11 */
+		flush_cache(ROUND_DOWN_CACHE((unsigned long)dst),
+			    ROUND_UP_CACHE(phdr->p_filesz));
+		++phdr;
+	}
+	if (!*run_addr)
+		*run_addr = ehdr->e_entry;
+
+	return 0;
+}
 
 static int load_image(u32 img_addr)
 {
@@ -586,6 +629,17 @@ static int get_image_len(u32 img_addr)
 	return img_len;
 }
 
+static void dsp_freq_default_set(void)
+{
+	u32 reg = DSP_FREQ_CONFIG_REG;
+	u32 val = 0;
+
+	val = AHBS_CLK_SRC_PLL_PERI2X | AHBS_CLK_DIV_RATIO_N_1 |
+	      AHBS_CLK_FACTOR_M(3);
+	writel(val, reg);
+
+}
+
 static void sram_remap_set(int value)
 {
 	u32 val = 0;
@@ -602,7 +656,7 @@ static void ahbs_clk_set(void)
 	u32 val = 0;
 
 	val = AHBS_CLK_SRC_PLL_PERI2X | AHBS_CLK_DIV_RATIO_N_1 |
-	      AHBS_CLK_FACTOR_M(8);
+	      AHBS_CLK_FACTOR_M(6);
 	writel(val, reg);
 
 }
@@ -614,6 +668,87 @@ static int update_reset_vec(u32 img_addr, u32 *run_addr)
 	ehdr = (Elf32_Ehdr *)img_addr;
 	if (!*run_addr)
 		*run_addr = ehdr->e_entry;
+
+	return 0;
+}
+
+int sunxi_dsp_init_old(u32 img_addr, u32 run_ddr, u32 dsp_id, u32 image_len)
+{
+	u32 reg_val;
+
+	load_image_old(img_addr, &run_ddr);
+
+#ifdef CONFIG_MACH_SUN50IW11
+	dsp_freq_default_set();
+#endif /* CONFIG_MACH_SUN50IW11 */
+
+	printf("DSP%d booting from 0x%x...\n", dsp_id, run_ddr);
+
+	if (dsp_id == 0) { /* DSP0 */
+		/* clock gating */
+		reg_val = readl(SUNXI_PRCM_BASE + PRCM_DSP_BGR_REG);
+		reg_val |= (1 << BIT_DSP0_GATING);
+		reg_val |= (1 << BIT_DSP0_CFG_GATING);
+		writel(reg_val, SUNXI_PRCM_BASE + PRCM_DSP_BGR_REG);
+
+		/* reset */
+		reg_val = readl(SUNXI_PRCM_BASE + PRCM_DSP_BGR_REG);
+		reg_val |= (1 << BIT_DSP0_CFG_RST);
+		reg_val |= (1 << BIT_DSP0_DBG_RST);
+		writel(reg_val, SUNXI_PRCM_BASE + PRCM_DSP_BGR_REG);
+
+		/* set external Reset Vector if needed */
+		if (run_ddr != DSP_DEFAULT_RST_VEC) {
+			writel(run_ddr, DSP0_CFG_BASE + DSP_ALT_RESET_VEC_REG);
+
+			reg_val = readl(DSP0_CFG_BASE + DSP_CTRL_REG0);
+			reg_val |= (1 << BIT_START_VEC_SEL);
+			writel(reg_val, DSP0_CFG_BASE + DSP_CTRL_REG0);
+		}
+
+		/* set runstall */
+		sunxi_dsp_set_runstall(dsp_id, 1);
+
+		/* de-assert dsp0 */
+		reg_val = readl(SUNXI_PRCM_BASE + PRCM_DSP_BGR_REG);
+		reg_val |= (1 << BIT_DSP0_RST);
+		writel(reg_val, SUNXI_PRCM_BASE + PRCM_DSP_BGR_REG);
+
+		/* clear runstall */
+		sunxi_dsp_set_runstall(dsp_id, 0);
+	} else { /* DSP1 */
+		/* clock gating */
+		reg_val = readl(SUNXI_PRCM_BASE + PRCM_DSP_BGR_REG);
+		reg_val |= (1 << BIT_DSP1_GATING);
+		reg_val |= (1 << BIT_DSP1_CFG_GATING);
+		writel(reg_val, SUNXI_PRCM_BASE + PRCM_DSP_BGR_REG);
+
+		/* reset */
+		reg_val = readl(SUNXI_PRCM_BASE + PRCM_DSP_BGR_REG);
+		reg_val |= (1 << BIT_DSP1_CFG_RST);
+		reg_val |= (1 << BIT_DSP1_DBG_RST);
+		writel(reg_val, SUNXI_PRCM_BASE + PRCM_DSP_BGR_REG);
+
+		/* set external Reset Vector if needed */
+		if (run_ddr != DSP_DEFAULT_RST_VEC) {
+			writel(run_ddr, DSP1_CFG_BASE + DSP_ALT_RESET_VEC_REG);
+
+			reg_val = readl(DSP1_CFG_BASE + DSP_CTRL_REG0);
+			reg_val |= (1 << BIT_START_VEC_SEL);
+			writel(reg_val, DSP1_CFG_BASE + DSP_CTRL_REG0);
+		}
+
+		/* set runstall */
+		sunxi_dsp_set_runstall(dsp_id, 1);
+
+		/* de-assert dsp1 */
+		reg_val = readl(SUNXI_PRCM_BASE + PRCM_DSP_BGR_REG);
+		reg_val |= (1 << BIT_DSP1_RST);
+		writel(reg_val, SUNXI_PRCM_BASE + PRCM_DSP_BGR_REG);
+
+		/* clear runstall */
+		sunxi_dsp_set_runstall(dsp_id, 0);
+	}
 
 	return 0;
 }
@@ -633,12 +768,21 @@ int sunxi_dsp_init(u32 img_addr, u32 run_ddr, u32 dsp_id)
 
 
 #if defined(CONFIG_SUNXI_VERIFY_DSP) && defined(CONFIG_SUNXI_IMAGE_VERIFIER)
+	// for IMAGE_HEADER, copy payload to img_addr
 	if (sunxi_verify_dsp(img_addr, image_len, dsp_id) < 0) {
 		return -1;
 	}
 #else
 	pr_msg("no verify dsp\n");
 #endif
+
+	if (sunxi_efuse_get_soc_ver() != SUN50IW11P1_VERSION_C) {
+		if (sunxi_dsp_init_old(img_addr, run_ddr, dsp_id, image_len) < 0) {
+			return -1;
+		}
+
+		return 0;
+	}
 
 	/* update run addr */
 	update_reset_vec(img_addr, &run_ddr);

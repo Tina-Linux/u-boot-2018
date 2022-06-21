@@ -63,13 +63,13 @@ uint clock_get_pll_ddr(void)
 
 uint clock_get_pll6(void)
 {
-	struct sunxi_prcm_reg *const prcm =
-		(struct sunxi_prcm_reg *)SUNXI_PRCM_BASE;
+	struct sunxi_ccm_reg *const ccm =
+		(struct sunxi_ccm_reg *)SUNXI_CCM_BASE;
 	uint reg_val;
 	uint factor_n, factor_m0, factor_m1;
 	uint pll6;
 
-	reg_val = readl(&prcm->pll6_cfg);
+	reg_val = readl(&ccm->pll6_cfg);
 
 	factor_m0 = ((reg_val >> 0) & 0x01) + 1;
 	factor_m1 = ((reg_val >> 1) & 0x01) + 1;
@@ -395,3 +395,28 @@ int usb_close_clock(void)
 	return 0;
 }
 
+void clock_open_timer(int timernum)
+{
+	u32 reg_value = 0;
+
+	reg_value = readl(SUNXI_CCM_BASE + 0x730 + timernum * 4);
+	reg_value |= (0 << 4);
+	reg_value |= (0 << 1);
+	writel(reg_value, (SUNXI_CCM_BASE + 0x730 + timernum * 4));
+	__msdelay(1);
+
+	reg_value = readl(SUNXI_CCM_BASE + 0x730 + timernum * 4);
+	reg_value |= (1 << 0);
+	writel(reg_value, (SUNXI_CCM_BASE + 0x730 + timernum * 4));
+	__msdelay(1);
+}
+
+void clock_close_timer(int timernum)
+{
+	u32 reg_value = 0;
+
+	reg_value = readl(SUNXI_CCM_BASE + 0x730 + timernum * 4);
+	reg_value |= (0 << 0);
+	writel(reg_value, (SUNXI_CCM_BASE + 0x730 + timernum * 4));
+	__msdelay(1);
+}

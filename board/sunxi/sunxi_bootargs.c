@@ -21,7 +21,7 @@ char *IGNORE_ENV_VARIABLE[] = {
 };
 #define NAME_SIZE 32
 int USER_DATA_NUM;
-char USER_DATA_NAME[10][NAME_SIZE] = { { '\0' } };
+char USER_DATA_NAME[32][NAME_SIZE] = { { '\0' } };
 
 void check_user_data(void)
 {

@@ -62,6 +62,7 @@ void sunxi_avb_setup_env(char *avb_version, char *hash_alg, u64 vbmeta_size,
 	char cmdline[1024] = { 0 };
 	char tmpbuf[128]   = { 0 };
 	str		   = env_get("bootargs");
+	uint32_t vbmeta_flags;
 	strcpy(cmdline, str);
 	sprintf(tmpbuf, " androidboot.vbmeta.avb_version=%s", "2.0");
 	strcat(cmdline, tmpbuf);
@@ -72,6 +73,13 @@ void sunxi_avb_setup_env(char *avb_version, char *hash_alg, u64 vbmeta_size,
 	sprintf(tmpbuf, " androidboot.vbmeta.digest=%s", sha1_hash);
 	strcat(cmdline, tmpbuf);
 	sprintf(tmpbuf, " androidboot.vbmeta.device_state=%s", lock_state);
+	strcat(cmdline, tmpbuf);
+	sunxi_avb_get_vbmeta_flags(&vbmeta_flags);
+	if (vbmeta_flags & AVB_VBMETA_IMAGE_FLAGS_HASHTREE_DISABLED) {
+		sprintf(tmpbuf, " androidboot.veritymode=%s", "disabled");
+	} else {
+		sprintf(tmpbuf, " androidboot.veritymode=%s", "enforcing");
+	}
 	strcat(cmdline, tmpbuf);
 	env_set("bootargs", cmdline);
 }

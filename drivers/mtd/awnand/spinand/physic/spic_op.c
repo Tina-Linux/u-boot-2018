@@ -85,13 +85,16 @@ static int spi0_change_clk(unsigned int dclk_src_sel, unsigned int dclk)
 
 	sclk0_src_sel = dclk_src_sel;
 	sclk0 = dclk;
-
+#if defined(CONFIG_MACH_SUN8IW21)
+	sclk0_src = 300;
+#else
 	if (sclk0_src_sel == 0x0)
 		sclk0_src = 24;
 	else if (sclk0_src_sel < 0x3)
 		sclk0_src = clock_get_pll6();
 	else
 		sclk0_src = 2 * clock_get_pll6();
+#endif
 
 	/* sclk0: 2*dclk */
 	/* sclk0_pre_ratio_n */
@@ -158,7 +161,8 @@ static int spic0_clk_request(void)
 	set_reg(SUNXI_CCM_BASE + 0x096c, reg_val);
 
 	/* 2. configure spic's sclk0 */
-#if defined(CONFIG_MACH_SUN50IW11) || defined(CONFIG_MACH_SUN8IW20)
+#if defined(CONFIG_MACH_SUN50IW11) || defined(CONFIG_MACH_SUN8IW20) ||	\
+	defined(CONFIG_MACH_SUN8IW21)
 	ret = spi0_change_clk(1, 10);
 #else
 	ret = spi0_change_clk(3, 10);
@@ -174,7 +178,8 @@ static int spic0_set_clk(unsigned int clk)
 {
 	int ret;
 
-#if defined(CONFIG_MACH_SUN50IW11) || defined(CONFIG_MACH_SUN8IW20)
+#if defined(CONFIG_MACH_SUN50IW11) || defined(CONFIG_MACH_SUN8IW20) ||	\
+	defined(CONFIG_MACH_SUN8IW21)
 	ret = spi0_change_clk(1, clk);
 #else
 	ret = spi0_change_clk(3, clk);
@@ -718,11 +723,12 @@ int update_right_delay_para(struct mtd_info *mtd)
 {
 	struct aw_spinand *spinand = mtd_to_spinand(mtd);
 	unsigned int sample_delay;
-	unsigned int start_ok = 0, end_ok = 0, len_ok = 0, mode_ok = 0;
-	unsigned int start_backup = 0, end_backup = 0, len_backup = 0;
+	unsigned int start_backup = 0, end_backup = 0;
 	unsigned int mode, startry_mode = 0, endtry_mode = 6, block = 0;
 	unsigned int ret, val;
 	int fdt_off;
+	unsigned int half_cycle_ps, sample_delay_ps = 160;
+	unsigned int min_delay = 0, max_delay = 0, right_sample_delay;
 
 	size_t retlen;
 	u_char *cache_source;
@@ -751,6 +757,8 @@ int update_right_delay_para(struct mtd_info *mtd)
 		return -EINVAL;
 	}
 	spic0_set_clk(val / 1000 / 1000);
+	/* How much (ps) is required for half a cycle */
+	half_cycle_ps = 1 * 1000 * 1000  / (val / 1000 / 1000) / 2;
 
 	cache_source = calloc(1, len);
 	cache_target = calloc(1, len);
@@ -776,48 +784,53 @@ int update_right_delay_para(struct mtd_info *mtd)
 
 			if (strncmp((char *)cache_source, (char *)cache_target,
 						len) == 0) {
-				pr_debug("mode:%d delat:%d ok!\n",
-						mode, sample_delay);
-				if (!len_backup) {
-					start_backup = sample_delay;
-					end_backup = sample_delay;
-				} else
-					end_backup = sample_delay;
-				len_backup++;
+				pr_debug("mode:%d delat:%d time:%dps[OK]\n",
+						mode, sample_delay,
+						mode * half_cycle_ps +
+						sample_delay * sample_delay_ps);
+				if (!start_backup) {
+					start_backup = mode * half_cycle_ps +
+						sample_delay * sample_delay_ps;
+					end_backup = mode * half_cycle_ps +
+						sample_delay * sample_delay_ps;
+				} else {
+					end_backup = mode * half_cycle_ps +
+						sample_delay * sample_delay_ps;
+				}
 			} else {
-				pr_debug("mode:%d delay:%d error!\n",
-						mode, sample_delay);
+				pr_debug("mode:%d delay:%d time:%dps [ERROR]\n",
+						mode, sample_delay,
+						mode * half_cycle_ps +
+						sample_delay * sample_delay_ps);
 				if (!start_backup)
 					continue;
 				else {
-					if (len_backup > len_ok) {
-						len_ok = len_backup;
-						start_ok = start_backup;
-						end_ok = end_backup;
-						mode_ok = mode;
-					}
+					if (!min_delay)
+						min_delay = start_backup;
+					else if (start_backup < min_delay)
+						min_delay = start_backup;
+					if (end_backup > max_delay)
+						max_delay = end_backup;
 
-					len_backup = 0;
 					start_backup = 0;
 					end_backup = 0;
 				}
 			}
 		}
 
-		if (len_backup > len_ok) {
-			len_ok = len_backup;
-			start_ok = start_backup;
-			end_ok = end_backup;
-			mode_ok = mode;
-		}
-		len_backup = 0;
+		if ((start_backup < min_delay || !min_delay) && start_backup)
+			min_delay = start_backup;
+		if (end_backup > max_delay)
+			max_delay = end_backup;
+
 		start_backup = 0;
 		end_backup = 0;
 
 		block++;
 	}
 
-	if (!len_ok) {
+	right_sample_delay = (min_delay + max_delay) / 2;
+	if (!right_sample_delay) {
 		spic0_samp_mode(0);
 		spic0_samp_dl_sw_status(0);
 		if ((val / 1000 / 1000) >= 60)
@@ -827,12 +840,16 @@ int update_right_delay_para(struct mtd_info *mtd)
 		else
 			spinand->right_sample_mode = DELAY_0_5_CYCLE_SAMPLE;
 	} else {
-		spinand->right_sample_delay = (start_ok + end_ok) / 2;
-		spinand->right_sample_mode = mode_ok;
+
+		spinand->right_sample_delay =
+			(right_sample_delay % half_cycle_ps) / sample_delay_ps;
+		spinand->right_sample_mode =
+			right_sample_delay / half_cycle_ps;
 		spic0_set_sample_delay(spinand->right_sample_delay);
 	}
-	pr_info("mode:%d start:%d end:%d right_sample_delay:%d\n",
-			mode_ok, start_ok, end_ok,
+	pr_info("Sample mode:%d  min_delay:%d max_delay:%d right_delay:%d)\n",
+			spinand->right_sample_mode,
+			min_delay, max_delay,
 			spinand->right_sample_delay);
 	spic0_set_sample_mode(spinand->right_sample_mode);
 

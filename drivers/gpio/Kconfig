@@ -315,4 +315,19 @@ config MPC8XXX_GPIO
 	  Aside from the standard functions of input/output mode, and output
 	  value setting, the open-drain feature, which can configure individual
 	  GPIOs to work as open-drain outputs, is supported.
+
+if ARCH_SUNXI
+choice
+	prompt "sunxi gpio ip version"
+	default SUNXI_GPIO_V1
+
+config SUNXI_GPIO_V1
+	bool "sunxi gpio v1"
+
+config SUNXI_GPIO_V2
+	bool "sunxi gpio v2"
+
+endchoice
+endif
 endmenu
+

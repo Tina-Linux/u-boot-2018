@@ -839,7 +839,10 @@ int console_init_f(void)
 	int debug_mode;
 	console_update_silent();
 	if (get_boot_work_mode() == WORK_MODE_BOOT)
-		script_parser_fetch("/soc/platform", "debug_mode", &debug_mode, 4);
+		if (uboot_spare_head.boot_data.debug_mode & 0x80) /* bit7 is one, means boot0 want to set debug_mode */
+			debug_mode = uboot_spare_head.boot_data.debug_mode & 0x7F;
+		else /* dts */
+			script_parser_fetch("/soc/platform", "debug_mode", &debug_mode, 4);
 	else
 		debug_mode = 8;
 	gd->debug_mode = debug_mode;

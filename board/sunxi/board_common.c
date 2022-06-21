@@ -61,6 +61,11 @@
 #endif
 #include <fastlogo.h>
 
+int  __attribute__((weak)) sunxi_platform_power_off(void)
+{
+	return 0;
+}
+
 void set_boot_work_mode(int work_mode)
 {
        uboot_spare_head.boot_data.work_mode = work_mode;
@@ -315,13 +320,22 @@ int sunxi_set_secure_mode(void)
 	    (gd->bootfile_mode == SUNXI_BOOT_FILE_TOC)) {
 		mode = sid_probe_security_mode();
 		if (!mode) {
-			if (sunxi_efuse_read("rotpk", hash, &hash_len)) {
-				printf("read puk hash fail\n");
-				return -1;
-			}
-			printf("read puk finished,len:%d\n", hash_len);
-			if (memcmp(hash, hash_tmp, sizeof(hash))) {
-				printf("puk hash not zero,fail\n");
+			int ret = sunxi_efuse_get_rotpk_status();
+
+			if (ret == -1) {
+				//api not supported, try read rotpk directly
+				if (sunxi_efuse_read("rotpk", hash,
+						     &hash_len)) {
+					printf("read puk hash fail\n");
+					return -1;
+				}
+				printf("read puk finished,len:%d\n", hash_len);
+				if (memcmp(hash, hash_tmp, sizeof(hash))) {
+					printf("puk hash not zero,fail\n");
+					return -1;
+				}
+			} else if (ret == 1) {
+				printf("puk burned,stop set secure mode!\n");
 				return -1;
 			}
 
@@ -671,17 +685,20 @@ int update_boot0_head_for_ota(void)
 
 int board_late_init(void)
 {
-	if (get_boot_work_mode() == WORK_MODE_BOOT) {
+	int work_mode = get_boot_work_mode();
 #ifdef CONFIG_SUNXI_TV_FASTLOGO
-		struct fastlogo_t *p_fastlogo;
+	struct fastlogo_t *p_fastlogo = NULL;
+	if (work_mode == WORK_MODE_BOOT || work_mode == WORK_MODE_CARD_UPDATE ||
+	    work_mode == WORK_MODE_CARD_PRODUCT) {
 		p_fastlogo =
-			create_fastlogo_inst("bootlogo.bmp", "boot-resource",
-					     "LogoRegData.bin",
-					     "boot-resource");
+			create_fastlogo_inst("bootlogo.bmp", "bootloader",
+					     "LogoRegData.bin", "bootloader");
 		if (p_fastlogo) {
 			p_fastlogo->display_fastlogo(p_fastlogo);
 		}
+	}
 #endif
+	if (work_mode == WORK_MODE_BOOT) {
 #ifdef CONFIG_SUNXI_SWITCH_SYSTEM
 		sunxi_auto_switch_system();
 #endif
@@ -703,7 +720,9 @@ int board_late_init(void)
 #endif
 
 #ifdef CONFIG_SUNXI_ARISC_EXIST
+#ifndef CONFIG_ARISC_DEASSERT_BEFORE_KERNEL
 		sunxi_arisc_probe();
+#endif
 #endif
 #ifdef CONFIG_SUNXI_OTA_TURNNING
 		update_boot0_head_for_ota();
@@ -758,6 +777,11 @@ int board_late_init(void)
 #elif defined(CONFIG_SUNXI_REPLACE_FDT_FROM_PARTITION)
 		sunxi_replace_fdt();
 		sunxi_update_fdt_para_for_kernel();
+#endif
+#ifdef CONFIG_SUNXI_TV_FASTLOGO
+		if (p_fastlogo) {
+			p_fastlogo->reserve_memory(p_fastlogo);
+		}
 #endif
 	}
 	return 0;
@@ -838,6 +862,9 @@ int sunxi_board_restart(int next_mode)
 int sunxi_board_shutdown(void)
 {
 	sunxi_board_close_source();
+#ifdef CONFIG_SUNXI_UBOOT_POWER_OFF
+	sunxi_platform_power_off();
+#endif
 #ifdef CONFIG_SUNXI_BMU
 	bmu_set_power_off();
 #endif
@@ -879,7 +906,7 @@ void sunxi_update_subsequent_processing(int next_work)
 
 	case SUNXI_UPDATE_NEXT_ACTION_REUPDATE:
 		printf("SUNXI_UPDATE_NEXT_ACTION_REUPDATE\n");
-		// sunxi_board_run_fel();
+		sunxi_board_run_fel();
 		break;
 
 	case SUNXI_UPDATE_NEXT_ACTION_BOOT:

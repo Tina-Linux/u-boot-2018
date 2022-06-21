@@ -68,6 +68,7 @@
 
 #define SUNXI_USBOTG_BASE		SUNXI_USB0_BASE
 #define SUNXI_RTC_DATA_BASE     (SUNXI_RTC_BASE+0x100)
+#define RTC_XO_CTRL_REG     (SUNXI_RTC_BASE+0x160)
 
 /*physical key*/
 #define SUNXI_GPADC_BASE                  (0x02009000L)

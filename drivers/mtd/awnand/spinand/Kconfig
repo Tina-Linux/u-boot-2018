@@ -44,3 +44,25 @@ config AW_MTD_SPINAND_UBOOT_BLKS
 	  Once changed, the image will be incompatible to old image.
 
 	  if unsure, set it 0.
+
+config AW_SPINAND_SIMULATE_MULTIPLANE
+	bool "enable simulate multiplane"
+	depends on AW_SPINAND_PHYSICAL_LAYER
+	default y
+	help
+	  spinand do not support multiplane. In order to adapt to aw nand
+	  we simulate multiplane. If set, the common physical layer should
+	  merge two continuous physical block to 'super block' for logical
+	  layer.
+
+	  Merge pages in two adjacent blocks with the same page num to super
+	  page. Merge adjacent blocks to super block.
+
+	  *   phy-block0   phy-block1    = super block 0
+	  * |------------|------------|
+	  * | phy-page 0 | phy-page 0 |  = super page 0 on super block 0
+	  * | phy-page 1 | phy-page 1 |  = super page 1 on super block 0
+	  * |     ...    |     ...    |
+	  * |------------|------------|
+
+	  If unsure, say Y.

@@ -23,9 +23,8 @@
 
 #include <linux/string.h>
 #include <sunxi_nand.h>
-#include "../nand_errno.h"
+#include <sunxi_nand_errno.h>
 #include "controller/ndfc_base.h"
-#include "rawnand.h"
 #include "rawnand_base.h"
 #include "rawnand_cfg.h"
 #include "rawnand_debug.h"
@@ -36,6 +35,8 @@
 #include "controller/ndfc_ops.h"
 #include "rawnand_boot.h"
 #include "../../nand_osal_uboot.h"
+
+#define SECTOR_SIZE 512 //the size of a sector, based on byte
 
 struct _nand_storage_info *g_nsi;
 struct _nand_storage_info g_nsi_data;
@@ -356,6 +357,10 @@ int init_nci_from_id(struct nand_chip_info *nci, struct sunxi_nand_flash_device 
 	nci->nand_write_boot0_one = rawnand_boot0_ops.write_boot0_one;
 
 	nci->is_lsb_page = chose_lsb_func(((nci->npi->operation_opt >> LSB_PAGE_POS) & 0xff));
+
+	nci->sharedpage_pairedwrite = (nci->npi->operation_opt & NAND_PAIRED_PAGE_SYNC) ? 1 : 0;
+	nci->sharedpage_offset = nci->npi->sharedpage_offset;
+
 
 	rawnand_update_timings_ift_ops(nci->npi->mfr_id);
 
@@ -2155,7 +2160,6 @@ int rawnand_get_chip_page_size(struct nand_chip_info *chip,
 				"SECTOR(1)@sector", type);
 		return ERR_NO_22;
 	}
-
 }
 
 int rawnand_get_chip_block_size(struct nand_chip_info *chip,

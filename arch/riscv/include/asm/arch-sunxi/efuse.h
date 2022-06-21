@@ -27,6 +27,7 @@ int sunxi_efuse_get_rotpk_status(void);
 int sid_probe_security_mode(void);
 int sid_set_security_mode(void);
 int  sid_get_security_status(void);
+int sunxi_efuse_verify_rotpk(u8 *hash);
 #endif
 
 #endif /* _SUNXI_SID_H */

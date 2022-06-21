@@ -7,11 +7,12 @@
  * cuizhikui <cuizhikui@allwinnertech.com>
  */
 
-
-#include "rawnand.h"
+#include <sunxi_nand.h>
+/*#include "rawnand.h"*/
 #include "rawnand_chip.h"
 #include "rawnand_debug.h"
 #include "rawnand_ids.h"
+#include <sunxi_nand_errno.h>
 
 
 struct itf_ops_t rawnand_itf_ops;

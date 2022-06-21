@@ -35,15 +35,18 @@
 #define   AXP2202_PWRON_STATUS           	(0x20)
 #define   AXP2202_VOFF_THLD            	(0x24)
 #define   AXP2202_OFF_CTL             	(0x27)
+#define   AXP2202_TS_CFG             	(0x50)
 #define   AXP2202_CHARGE1             	(0x62)
+
 #define   AXP2202_CHGLED_SET             	(0x70)
 
+#define   AXP2202_ADC_CH_EN0             	(0xc0)
 #define   AXP2202_BAT_AVERVOL_H6          (0xc4)
 #define   AXP2202_BAT_AVERVOL_L8          (0xc5)
 
 #define   AXP2202_FUEL_GAUGE_CTL       	(0x0B)
 #define   AXP2202_BAT_PERCEN_CAL			(0xA4)
-
+#define   AXP2202_GAUGE_CONFIG			(0xA2)
 #endif /* __AXP2202_REGS_H__ */
 
 

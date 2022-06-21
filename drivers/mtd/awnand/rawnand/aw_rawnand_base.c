@@ -323,7 +323,7 @@ int aw_rawnand_chip_erase(struct mtd_info *mtd, int page)
 	status = chip->dev_status(mtd);
 
 	if (status & RAWNAND_STATUS_FAIL) {
-		ret = 0;
+		ret = -EIO;
 		awrawnand_err("%s erase block@%d fail\n", __func__, page >> chip->pages_per_blk_shift);
 	}
 	awrawnand_chip_trace("Exit %s ret@%d\n", __func__, ret);
@@ -374,7 +374,7 @@ int aw_rawnand_chip_real_multi_erase(struct mtd_info *mtd, int page)
 	status = chip->dev_status(mtd);
 
 	if (status & RAWNAND_STATUS_FAIL) {
-		ret = 0;
+		ret = -EIO;
 		awrawnand_err("%s erase block@%d fail\n", __func__, page >> chip->pages_per_blk_shift);
 	}
 	awrawnand_chip_trace("Exit %s ret@%d\n", __func__, ret);
@@ -434,7 +434,7 @@ int aw_rawnand_chip_real_onfi_multi_erase(struct mtd_info *mtd, int page)
 	status = chip->dev_status(mtd);
 
 	if (status & RAWNAND_STATUS_FAIL) {
-		ret = 0;
+		ret = -EIO;
 		awrawnand_err("%s erase block@%d fail\n", __func__, page >> chip->pages_per_blk_shift);
 	}
 
@@ -1070,6 +1070,8 @@ static bool aw_rawnand_is_valid_id(uint8_t id)
 	/*case RAWNAND_MFR_MXIC:*/ /*the same MACRONIX*/
 	/*case RAWNAND_MFR_FORESEE:*/ /*the same SAMSUNG*/
 	case RAWNAND_MFR_WINBOND:
+	case RAWNAND_MFR_DOSILICON:
+	case RAWNAND_MFR_FORESEE_1:
 		ret = true;
 		break;
 	default:
@@ -1243,8 +1245,8 @@ static int aw_rawnand_mtd_read(struct mtd_info *mtd, loff_t from, size_t len,
 	uint8_t *mdata = (uint8_t *)buf;
 	unsigned int max_bitflips = 0;
 	bool ecc_failed = false;
-	struct aw_nand_chip_cache *buffer = &chip->buffer;
-	uint8_t *pagebuf = buffer->pagebuf;
+	struct aw_nand_chip_cache *buffer = &chip->simu_chip_buffer;
+	uint8_t *pagebuf = buffer->simu_pagebuf;
 	int col = from & chip->simu_pagesize_mask;
 	int mlen = min_t(unsigned int, (mtd->writesize - col), len);
 
@@ -1261,7 +1263,10 @@ static int aw_rawnand_mtd_read(struct mtd_info *mtd, loff_t from, size_t len,
 	chip->select_chip(mtd, chipnr);
 
 	do {
-		if (page == buffer->pageno && mlen <= buffer->valid_page_len) {
+		if ((page_in_chip == buffer->simu_pageno) &&
+			(col >= buffer->valid_col) &&
+			((col + len) <= (buffer->valid_col + buffer->valid_len))) {
+
 			memcpy(mdata, pagebuf + col, mlen);
 			mtd->ecc_stats.failed = 0;
 			max_bitflips = buffer->bitflips;
@@ -1274,10 +1279,10 @@ static int aw_rawnand_mtd_read(struct mtd_info *mtd, loff_t from, size_t len,
 			 *len_to_read = (len_to_read << 10);
 			 */
 #if SIMULATE_MULTIPLANE
-			ret = chip->multi_read_page(mtd, chip, pagebuf, buffer->page_len, NULL, 0,
+			ret = chip->multi_read_page(mtd, chip, pagebuf, buffer->simu_page_len, NULL, 0,
 					page_in_chip);
 #else
-			ret = chip->read_page(mtd, chip, pagebuf, buffer->page_len, NULL, 0,
+			ret = chip->read_page(mtd, chip, pagebuf, buffer->simu_page_len, NULL, 0,
 					page_in_chip);
 #endif
 			if (ret == ECC_LIMIT) {
@@ -1292,23 +1297,23 @@ static int aw_rawnand_mtd_read(struct mtd_info *mtd, loff_t from, size_t len,
 				mtd->ecc_stats.failed++;
 				awrawnand_err("ecc err from@0x%llx len@0x%lx in page@%d\n",
 						from, len, page);
+				buffer->simu_pageno = INVALID_CACHE;
+				buffer->simu_oobno = INVALID_CACHE;
+				buffer->chipno = INVALID_CACHE;
 			} else if (ret < 0) {
 				awrawnand_err("read from @0x%llx len@0x%lx fail in page@%d\n",
 						from, len, page);
 
-				buffer->pageno = INVALID_CACHE;
-				buffer->oobno = INVALID_CACHE;
-				buffer->valid_page_len = 0;
-				buffer->valid_oob_len = 0;
+				buffer->simu_pageno = INVALID_CACHE;
+				buffer->simu_oobno = INVALID_CACHE;
 				buffer->chipno = INVALID_CACHE;
 				break;
 			}
 			/*dump_data(pagebuf, buffer->page_len);*/
 
-			buffer->pageno = page_in_chip;
-			buffer->oobno = page_in_chip;
-			buffer->valid_page_len = buffer->page_len;
-			buffer->valid_oob_len = buffer->oob_len;
+			buffer->simu_pageno = page_in_chip;
+			buffer->valid_col = col;
+			buffer->valid_len = mlen;
 			buffer->chipno = chipnr;
 
 			mtd->ecc_stats.failed = 0;
@@ -1377,9 +1382,9 @@ static int aw_rawnand_mtd_read_oob(struct mtd_info *mtd, loff_t from,
 	uint8_t *sdata = ops->oobbuf;
 	unsigned int max_bitflips = 0;
 	bool ecc_failed = false;
-	struct aw_nand_chip_cache *buffer = &chip->buffer;
-	uint8_t *pagebuf = buffer->pagebuf;
-	uint8_t *oobbuf = buffer->oobbuf;
+	struct aw_nand_chip_cache *buffer = &chip->simu_chip_buffer;
+	uint8_t *pagebuf = buffer->simu_pagebuf;
+	uint8_t *oobbuf = buffer->simu_oobbuf;
 	loff_t col = from & chip->simu_pagesize_mask;
 	/*int mlen = mtd->writesize - col;*/
 	/*int mlen = min((mtd->writesize - col), len);*/
@@ -1403,21 +1408,28 @@ static int aw_rawnand_mtd_read_oob(struct mtd_info *mtd, loff_t from,
 
 	do {
 
-		if (page == buffer->pageno && mlen <= buffer->valid_page_len && slen == 0) {
+		/*if (page == buffer->pageno && mlen <= buffer->valid_page_len && slen == 0) {*/
+		if ((page_in_chip == buffer->simu_oobno) &&
+			(page_in_chip == buffer->simu_pageno) &&
+			(col >= buffer->valid_col) &&
+			((col + len) <= (buffer->valid_col + buffer->valid_len)) &&
+			(ops->ooboffs >= buffer->valid_oob_col) &&
+			((ops->ooboffs + ops->ooblen) <=
+			 (buffer->valid_oob_col + buffer->valid_oob_len))) {
+
 			memcpy(mdata, pagebuf + col, mlen);
-			if (buffer->oobno != INVALID_CACHE)
-				memcpy(sdata, oobbuf, slen);
+			memcpy(sdata, oobbuf, slen);
 			mtd->ecc_stats.failed = 0;
 			max_bitflips = buffer->bitflips;
 
 		} else {
 #if SIMULATE_MULTIPLANE
-			ret = chip->multi_read_page(mtd, chip, pagebuf, buffer->page_len,
-					oobbuf, buffer->oob_len, page_in_chip);
+			ret = chip->multi_read_page(mtd, chip, pagebuf, buffer->simu_page_len,
+					oobbuf, buffer->simu_oob_len, page_in_chip);
 
 #else
-			ret = chip->read_page(mtd, chip, pagebuf, buffer->page_len,
-					oobbuf, buffer->oob_len, page_in_chip);
+			ret = chip->read_page(mtd, chip, pagebuf, buffer->simu_page_len,
+					oobbuf, buffer->simu_oob_len, page_in_chip);
 #endif
 			if (ret == ECC_LIMIT) {
 				ret = mtd->bitflip_threshold;
@@ -1432,31 +1444,35 @@ static int aw_rawnand_mtd_read_oob(struct mtd_info *mtd, loff_t from,
 				mtd->ecc_stats.failed++;
 				awrawnand_err("ecc err from@%llx len@%lx in page@%d &&\n",
 						from, ops->len, page);
-				awrawnand_err("main data len@%d\n", buffer->page_len);
-				dump_data(pagebuf, buffer->page_len);
-				awrawnand_err("spare len@%d\n", buffer->oob_len);
-				dump_data(oobbuf, buffer->oob_len);
+				awrawnand_err("main data len@%d\n", buffer->simu_page_len);
+				dump_data(pagebuf, buffer->simu_page_len);
+				awrawnand_err("spare len@%d\n", buffer->simu_oob_len);
+				dump_data(oobbuf, buffer->simu_oob_len);
+				buffer->simu_pageno = INVALID_CACHE;
+				buffer->simu_oobno = INVALID_CACHE;
+				buffer->chipno = INVALID_CACHE;
+
 			} else if (ret < 0) {
 				awrawnand_err("read from @%llx len@%lx fail in page@%d $$\n",
 						from, ops->len, page);
-				buffer->pageno = INVALID_CACHE;
-				buffer->oobno = INVALID_CACHE;
-				buffer->valid_page_len = 0;
-				buffer->valid_oob_len = 0;
+				buffer->simu_pageno = INVALID_CACHE;
+				buffer->simu_oobno = INVALID_CACHE;
 				buffer->chipno = INVALID_CACHE;
 				break;
 			}
-
-			buffer->pageno = page_in_chip;
-			buffer->oobno = page_in_chip;
-			buffer->valid_page_len = buffer->page_len;
-			buffer->valid_oob_len = buffer->oob_len;
-			buffer->chipno = chipnr;
 
 			mtd->ecc_stats.failed = 0;
 			buffer->bitflips = max_bitflips;
 			memcpy(mdata, pagebuf + col, mlen);
 			memcpy(sdata, oobbuf, slen);
+
+			buffer->simu_pageno = page_in_chip;
+			buffer->simu_oobno = page_in_chip;
+			buffer->valid_col = col;
+			buffer->valid_len = mlen;
+			buffer->valid_oob_col = 0;
+			buffer->valid_oob_len = slen;
+			buffer->chipno = chipnr;
 
 		}
 
@@ -1540,11 +1556,12 @@ static int aw_rawnand_mtd_write_oob(struct mtd_info *mtd, loff_t to,
 	uint8_t *mdata = ops->datbuf;
 	uint8_t *sdata = ops->oobbuf;
 	int slen = min_t(unsigned int, ops->ooblen, mtd->oobavail);
-	struct aw_nand_chip_cache *buffer = &chip->buffer;
-	uint8_t *pagebuf = buffer->pagebuf;
-	uint8_t *oobbuf = buffer->oobbuf;
-	/*int col = to & chip->pagesize_mask;*/
-	int mlen = min(ops->len, mtd->writesize);
+	struct aw_nand_chip_cache *buffer = &chip->simu_chip_buffer;
+	uint8_t *pagebuf = buffer->simu_pagebuf;
+	uint8_t *oobbuf = buffer->simu_oobbuf;
+	int mlen = min_t(unsigned int, ops->len, mtd->writesize);
+	int blockA = 0;
+	int col = (to & chip->simu_pagesize_mask);
 
 	awrawnand_mtd_trace("Enter %s [%llx:%lx]\n", __func__, to, ops->len);
 
@@ -1553,7 +1570,7 @@ static int aw_rawnand_mtd_write_oob(struct mtd_info *mtd, loff_t to,
 	}
 
 	block = to >> mtd->erasesize_shift;
-	int blockA = block << 1;
+	blockA = block << 1;
 	if (to & mtd->erasesize_mask)
 		sub_page = ((blockA + 1) << chip->pages_per_blk_shift);
 	else
@@ -1577,7 +1594,7 @@ static int aw_rawnand_mtd_write_oob(struct mtd_info *mtd, loff_t to,
 
 	mutex_lock(&chip->lock);
 
-	memcpy(pagebuf, mdata, mlen);
+	memcpy(pagebuf + col, mdata, mlen);
 
 	if (likely(!sdata))
 		slen = 0;
@@ -1589,12 +1606,14 @@ static int aw_rawnand_mtd_write_oob(struct mtd_info *mtd, loff_t to,
 
 	if (write_sub_page) {
 		sub_page_in_chip = sub_page & chip->chip_pages_mask;
-		buffer->pageno = sub_page_in_chip;
-		buffer->oobno = sub_page_in_chip;
-		buffer->valid_page_len = buffer->sub_page_len;
+		buffer->simu_pageno = (to >> chip->simu_pagesize_shift);
+		buffer->simu_oobno = buffer->simu_pageno;
+		buffer->valid_col = col;
+		buffer->valid_len = mlen;
+		buffer->valid_oob_col = 0;
 		buffer->valid_oob_len = slen;
 		buffer->chipno = chipnr;
-		ret = chip->write_page(mtd, chip, pagebuf, buffer->sub_page_len,
+		ret = chip->write_page(mtd, chip, pagebuf + col, buffer->sub_page_len,
 				oobbuf, slen, sub_page_in_chip);
 	} else {
 		/*last page use program(0x10)*/
@@ -1615,14 +1634,11 @@ static int aw_rawnand_mtd_write_oob(struct mtd_info *mtd, loff_t to,
 			if (!(page_in_chip & chip->pages_per_blk_mask)) {
 				page_in_chip--;
 
-				buffer->pageno = page_in_chip;
-				buffer->oobno = page_in_chip;
-				buffer->chipno = chipnr;
 #if SIMULATE_MULTIPLANE
-				ret = chip->multi_write_page(mtd, chip, pagebuf, buffer->page_len,
+				ret = chip->multi_write_page(mtd, chip, pagebuf, buffer->simu_page_len,
 						oobbuf, slen, page_in_chip);
 #else
-				ret = chip->write_page(mtd, chip, pagebuf, buffer->page_len,
+				ret = chip->write_page(mtd, chip, pagebuf, buffer->simu_page_len,
 						oobbuf, slen, page_in_chip);
 #endif
 				if (ret) {
@@ -1634,18 +1650,15 @@ static int aw_rawnand_mtd_write_oob(struct mtd_info *mtd, loff_t to,
 			} else {
 
 				page_in_chip--;
-				buffer->pageno = page_in_chip;
-				buffer->oobno = page_in_chip;
-				buffer->chipno = chipnr;
 				if (RAWNAND_HAS_CACHEPROG(chip)) {
-					ret = chip->cache_write_page(mtd, chip, pagebuf, buffer->page_len,
+					ret = chip->cache_write_page(mtd, chip, pagebuf, buffer->simu_page_len,
 							oobbuf, slen, page_in_chip);
 				} else {
 #if SIMULATE_MULTIPLANE
-					ret = chip->multi_write_page(mtd, chip, pagebuf, buffer->page_len,
+					ret = chip->multi_write_page(mtd, chip, pagebuf, buffer->simu_page_len,
 							oobbuf, slen, page_in_chip);
 #else
-					ret = chip->write_page(mtd, chip, pagebuf, buffer->page_len,
+					ret = chip->write_page(mtd, chip, pagebuf, buffer->simu_page_len,
 							oobbuf, slen, page_in_chip);
 #endif
 				}
@@ -1657,9 +1670,10 @@ static int aw_rawnand_mtd_write_oob(struct mtd_info *mtd, loff_t to,
 			}
 
 			/*len -= mlen;*/
-			mdata += buffer->page_len;
+			col = 0;
+			mdata += buffer->simu_page_len;
 			/*mlen = min_t(unsigned int, len, mtd->writesize);*/
-			memcpy(pagebuf, mdata, buffer->page_len);
+			memcpy(pagebuf, mdata, buffer->simu_page_len);
 
 			if (unlikely(sdata)) {
 				ooblen -= slen;
@@ -1669,6 +1683,7 @@ static int aw_rawnand_mtd_write_oob(struct mtd_info *mtd, loff_t to,
 				sdata = slen ? sdata : NULL;
 				if (sdata)
 					memcpy(oobbuf, sdata, slen);
+				buffer->simu_oobno = page;
 			}
 		}
 
@@ -1679,16 +1694,18 @@ static int aw_rawnand_mtd_write_oob(struct mtd_info *mtd, loff_t to,
 			chip->select_chip(mtd, ++chipnr);
 		}
 		/*write last page, use program(0x10)*/
-		buffer->pageno = page_in_chip;
-		buffer->valid_page_len = buffer->page_len;
-		buffer->oobno = page_in_chip;
+		buffer->simu_pageno = page_in_chip;
+		buffer->valid_col = 0;
+		buffer->valid_len = buffer->simu_page_len;
+		buffer->simu_oobno = buffer->simu_pageno;
+		buffer->valid_oob_col = 0;
 		buffer->valid_oob_len = slen;
 		buffer->chipno = chipnr;
 #if SIMULATE_MULTIPLANE
-		ret = chip->multi_write_page(mtd, chip, pagebuf, buffer->page_len,
+		ret = chip->multi_write_page(mtd, chip, pagebuf, buffer->simu_page_len,
 				oobbuf, slen, page_in_chip);
 #else
-		ret = chip->write_page(mtd, chip, pagebuf, buffer->page_len,
+		ret = chip->write_page(mtd, chip, pagebuf, buffer->simu_page_len,
 				oobbuf, slen, page_in_chip);
 
 #endif
@@ -1710,10 +1727,8 @@ out:
 		awrawnand_err("write page@%d fail\n", page);
 		ops->retlen = 0;
 		ops->oobretlen = 0;
-		buffer->pageno = INVALID_CACHE;
-		buffer->oobno = INVALID_CACHE;
-		buffer->valid_page_len = 0;
-		buffer->valid_oob_len = 0;
+		buffer->simu_pageno = INVALID_CACHE;
+		buffer->simu_oobno = INVALID_CACHE;
 	} else {
 		ops->retlen = len;
 		if (unlikely(sdata))
@@ -1896,7 +1911,12 @@ static int aw_rawnand_chip_data_init(struct mtd_info *mtd)
 
 	chip->simu_chipsize = chip->chipsize;
 
-	chip->chip_shift = ffs(chip->chipsize) - 1;
+	if (chip->chipsize <= 0xffffffff)
+		chip->chip_shift = ffs((unsigned)chip->chipsize) - 1;
+	else {
+		chip->chip_shift = ffs((unsigned)(chip->chipsize >> 32));
+		chip->chip_shift += 32 - 1;
+	}
 	chip->simu_chip_shift = chip->chip_shift;
 	chip->pages_per_blk_shift = ffs(dev->pages_per_blk) -1;
 	chip->simu_pages_per_blk_shift = chip->pages_per_blk_shift;
@@ -1939,7 +1959,11 @@ static int aw_rawnand_chip_data_init(struct mtd_info *mtd)
 	chip->data_interface.type = aw_rawnand_get_itf_type(chip);
 
 	chip->random = RAWNAND_NFC_NEED_RANDOM(chip);
-	chip->row_cycles = 3;
+
+	if (RAWNAND_HAS_ONLY_TWO_DDR(chip))
+		chip->row_cycles = 2;
+	else
+		chip->row_cycles = 3;
 	chip->badblock_mark_pos = dev->badblock_flag_pos;
 
 	bbtsize = ((chip->chips * chip->chipsize) >> chip->erase_shift);
@@ -1959,15 +1983,15 @@ static int aw_rawnand_chip_data_init(struct mtd_info *mtd)
 		return -ENOMEM;
 	}
 #if SIMULATE_MULTIPLANE
-	chip->buffer.page_len = (chip->pagesize << 1);
+	chip->simu_chip_buffer.simu_page_len = (chip->pagesize << 1);
 #else
-	chip->buffer.page_len = chip->pagesize;
+	chip->simu_chip_buffer.simu_page_len = chip->pagesize;
 
 #endif
-	chip->buffer.sub_page_len = chip->pagesize;
+	chip->simu_chip_buffer.sub_page_len = chip->pagesize;
 
-	chip->buffer.pagebuf = kzalloc(chip->buffer.page_len, GFP_KERNEL);
-	if (!chip->buffer.pagebuf) {
+	chip->simu_chip_buffer.simu_pagebuf = kzalloc(chip->simu_chip_buffer.simu_page_len, GFP_KERNEL);
+	if (!chip->simu_chip_buffer.simu_pagebuf) {
 		awrawnand_err("kzalloc pagebuf fail\n");
 		free(chip->bbt);
 		free(chip->bbtd);
@@ -1975,22 +1999,22 @@ static int aw_rawnand_chip_data_init(struct mtd_info *mtd)
 	}
 
 #if SIMULATE_MULTIPLANE
-	chip->buffer.oob_len = chip->avalid_sparesize << 1;
+	chip->simu_chip_buffer.simu_oob_len = chip->avalid_sparesize << 1;
 #else
-	chip->buffer.oob_len = chip->avalid_sparesize;
+	chip->simu_chip_buffer.simu_oob_len = chip->avalid_sparesize;
 #endif
-	chip->buffer.oobbuf = kzalloc(chip->buffer.oob_len, GFP_KERNEL);
-	if (!chip->buffer.oobbuf) {
+	chip->simu_chip_buffer.simu_oobbuf = kzalloc(chip->simu_chip_buffer.simu_oob_len, GFP_KERNEL);
+	if (!chip->simu_chip_buffer.simu_oobbuf) {
 		awrawnand_err("kzalloc oobbuf fail\n");
 		free(chip->bbt);
 		free(chip->bbtd);
-		free(chip->buffer.pagebuf);
+		kfree(chip->simu_chip_buffer.simu_pagebuf);
 		return -ENOMEM;
 	}
 
-	chip->buffer.pageno = INVALID_CACHE;
-	chip->buffer.oobno = INVALID_CACHE;
-	chip->buffer.bitflips = 0;
+	chip->simu_chip_buffer.simu_pageno = INVALID_CACHE;
+	chip->simu_chip_buffer.simu_oobno = INVALID_CACHE;
+	chip->simu_chip_buffer.bitflips = 0;
 
 	if (chip->type == SLC_NAND) {
 		chip->write_boot0_page = rawslcnand_write_boot0_page;
@@ -2002,6 +2026,7 @@ static int aw_rawnand_chip_data_init(struct mtd_info *mtd)
 
 	mutex_init(&chip->lock);
 
+	awrawnand_info("chip: row_cycles@%d\n", chip->row_cycles);
 	awrawnand_info("chip: chip_shift@%d\n", chip->chip_shift);
 	awrawnand_info("chip: pagesize_mask@%d\n", chip->pagesize_mask);
 	awrawnand_info("chip: chip_pages@%d\n", chip->chip_pages);
@@ -2022,8 +2047,8 @@ static void aw_rawnand_chip_data_destroy(struct mtd_info *mtd)
 
 	kfree(chip->bbt);
 	kfree(chip->bbtd);
-	kfree(chip->buffer.pagebuf);
-	kfree(chip->buffer.oobbuf);
+	kfree(chip->simu_chip_buffer.simu_pagebuf);
+	kfree(chip->simu_chip_buffer.simu_oobbuf);
 }
 
 static int aw_rawnand_mtd_info_init(struct mtd_info *mtd)
