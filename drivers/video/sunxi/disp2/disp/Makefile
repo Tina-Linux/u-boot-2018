@@ -8,7 +8,7 @@ obj-$(CONFIG_DISP2_SUNXI) += disp.o
 
 disp-objs	:= dev_disp.o disp_sys_intf.o
 disp-objs	+= de/disp_display.o de/disp_features.o de/disp_device.o de/disp_lcd.o de/disp_manager.o de/disp_private.o \
-			   de/disp_smart_backlight.o de/disp_enhance.o de/disp_capture.o de/disp_tv.o  de/disp_vga.o de/disp_vdevice.o \
+			   de/disp_smart_backlight.o de/disp_enhance.o de/disp_capture.o de/disp_hdmi.o de/disp_tv.o  de/disp_vga.o de/disp_vdevice.o \
 			   de/disp_edp.o
 
 disp-$(CONFIG_EINK_PANEL_USED) += de/disp_eink_manager.o de/eink_pipeline_manager.o
@@ -34,6 +34,7 @@ disp-$(CONFIG_LCD_SUPPORT_LH219WQ1) += lcd/lh219wq1.o
 disp-$(CONFIG_LCD_SUPPORT_ST7789V) += lcd/st7789v.o
 disp-$(CONFIG_LCD_SUPPORT_ST7796S) += lcd/st7796s.o
 disp-$(CONFIG_LCD_SUPPORT_ST7701S) += lcd/st7701s.o
+disp-$(CONFIG_LCD_SUPPORT_ST7701S_G5) += lcd/st7701s_g5.o
 disp-$(CONFIG_LCD_SUPPORT_WTL096601G03) += lcd/wtl096601g03.o
 disp-$(CONFIG_LCD_SUPPORT_T30P106) += lcd/t30p106.o
 disp-$(CONFIG_LCD_SUPPORT_TO20T20000) += lcd/to20t20000.o
@@ -59,6 +60,11 @@ disp-$(CONFIG_LCD_SUPPORT_ZS080NI4003E7H3H_A) += lcd/zs080ni4003e7h3h_a.o
 disp-$(CONFIG_LCD_SUPPORT_K101_IM2BYL02_L_800X1280) += lcd/K101_IM2BYL02_L_800X1280.o
 disp-$(CONFIG_LCD_SUPPORT_JD9366AB_3) += lcd/jd9366ab_3.o
 disp-$(CONFIG_LCD_SUPPORT_TFT08006) += lcd/tft08006.o
+disp-$(CONFIG_LCD_SUPPORT_T050K589) += lcd/t050k589.o
+disp-$(CONFIG_LCD_SUPPORT_JD9161Z_MIPI) += lcd/jd9161z_mipi.o
+disp-$(CONFIG_LCD_SUPPORT_K101_MM2QA01_A) += lcd/K101_MM2QA01_A.o
+disp-$(CONFIG_LCD_SUPPORT_ICN6202) += lcd/icn6202.o
+disp-$(CONFIG_LCD_SUPPORT_NT35510_MIPI) += lcd/nt35510.o
 
 ifeq ($(CONFIG_MACH_SUN8IW6),y)
     export MIPI_DSI_IP_VERSION := 28
@@ -135,6 +141,12 @@ ifeq ($(CONFIG_MACH_SUN8IW19),y)
     export MIPI_DSI_IP_VERSION := 28
     obj-y += de/lowlevel_v2x/
 endif
+
+ifeq ($(CONFIG_MACH_SUN8IW21),y)
+    export MIPI_DSI_IP_VERSION := 40
+    obj-y += de/lowlevel_v2x/
+endif
+
 
 ifeq ($(CONFIG_MACH_SUN8IW20),y)
     export MIPI_DSI_IP_VERSION := 40

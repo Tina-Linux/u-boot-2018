@@ -15,6 +15,8 @@
 struct eink_driver_info g_eink_drvdata;
 
 u32 eink_dbg_info;
+struct disp_layer_config_inner eink_para[16];
+struct disp_layer_config eink_lyr_cfg2[16];
 
 s32 eink_set_print_level(u32 level)
 {
@@ -44,6 +46,7 @@ static void eink_unload_resource(struct eink_driver_info *drvdata)
 static int eink_init(struct init_para *para)
 {
 	eink_get_sys_config(para);
+	fmt_convert_mgr_init(para);
 	eink_mgr_init(para);
 	return 0;
 }
@@ -166,12 +169,20 @@ static int eink_driver_exit(void)
 	return 0;
 }
 #endif
+
+static s32 copy_to_user(void *dest, void *src, u32 size)
+{
+	memcpy(dest, src, size);
+	return 0;
+}
+
 long eink_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 {
 	long ret = 0;
 	unsigned long karg[4];
 	unsigned long ubuffer[4] = { 0 };
 	struct eink_manager *eink_mgr = NULL;
+	const unsigned int eink_lyr_cfg2_size = ARRAY_SIZE(eink_lyr_cfg2);
 
 	eink_mgr = g_eink_drvdata.eink_mgr;
 
@@ -187,6 +198,64 @@ long eink_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 	ubuffer[3] = (*(unsigned long *)(karg + 3));
 
 	switch (cmd) {
+	case EINK_WRITE_BACK_IMG:
+		{
+			s32 i = 0;
+			struct eink_img last_img;
+			struct eink_img cur_img;
+
+			if (IS_ERR_OR_NULL((void __user *)ubuffer[2])) {
+				__wrn("incoming pointer of user is ERR or NULL");
+				return -EFAULT;
+			}
+			if (ubuffer[1] == 0 || ubuffer[1] > eink_lyr_cfg2_size) {
+				__wrn("layer number need to be set from 1 to %d\n", eink_lyr_cfg2_size);
+				return -EFAULT;
+			}
+
+			if (!eink_mgr) {
+				pr_err("there is no eink manager!\n");
+				break;
+			}
+			memset(eink_lyr_cfg2, 0,
+					16 * sizeof(struct disp_layer_config2));
+
+			if (copy_from_user(eink_lyr_cfg2, (void __user *)ubuffer[0],
+						sizeof(struct disp_layer_config2) * ubuffer[1])) {
+				pr_err("layer config copy_from_user fail\n");
+				return -EFAULT;
+			}
+
+			if (copy_from_user(&last_img, (void __user *)ubuffer[2],
+						sizeof(struct eink_img))) {
+				pr_err("last img copy_from_user fail\n");
+				return -EFAULT;
+			}
+
+			if (copy_from_user(&cur_img, (void __user *)ubuffer[3],
+						sizeof(struct eink_img))) {
+				pr_err("cur img copy_from_user fail\n");
+				return -EFAULT;
+			}
+
+			for (i = 0; i < ubuffer[1]; i++)
+				__disp_config_transfer2inner(&eink_para[i],
+						&eink_lyr_cfg2[i]);
+
+			if (eink_mgr->eink_fmt_cvt_img)
+				ret = eink_mgr->eink_fmt_cvt_img(
+						(struct disp_layer_config_inner *)&eink_para[0],
+						(unsigned int)ubuffer[1],
+						&last_img, &cur_img);
+			if (ret == 0) {
+				if (copy_to_user((void __user *)ubuffer[3], &cur_img,
+							sizeof(struct eink_img))) {
+					pr_err("cur img copy_to_user fail\n");
+					return -EFAULT;
+				}
+			}
+			break;
+		}
 	case EINK_UPDATE_IMG:
 		{
 			struct eink_img cur_img;
@@ -202,8 +271,6 @@ long eink_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 				pr_err("copy_from_user fail\n");
 				return -EFAULT;
 			}
-
-			printk("\n");
 
 			if (eink_mgr->eink_update)
 				ret = eink_mgr->eink_update(eink_mgr, &cur_img);
@@ -230,6 +297,11 @@ long eink_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 		{
 			if (eink_mgr->eink_set_global_clean_cnt)
 				ret = eink_mgr->eink_set_global_clean_cnt(eink_mgr, ubuffer[0]);
+			break;
+		}
+	case EINK_WAIT_PIPE_FINISH:
+		{
+			return eink_mgr->get_pipe_finish_status(eink_mgr);
 			break;
 		}
 

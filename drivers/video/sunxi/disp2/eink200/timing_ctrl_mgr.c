@@ -871,6 +871,9 @@ static s32 timing_ctrl_set_close_func(struct timing_ctrl_manager *mgr,
 s32 timing_ctrl_mgr_enable(struct timing_ctrl_manager *mgr)
 {
 	int ret = 0, i = 0;
+	if (mgr->enabled == true) {
+		return 0;
+	}
 
 	eink_config_timing_param(&mgr->info);
 	eink_timing_gen_enable();
@@ -905,6 +908,7 @@ s32 timing_ctrl_mgr_enable(struct timing_ctrl_manager *mgr)
 		}
 	}
 
+	mgr->enabled = true;
 	return ret;
 }
 
@@ -943,6 +947,7 @@ int timing_ctrl_mgr_disable(struct timing_ctrl_manager *mgr)
 		}
 	}
 
+	mgr->enabled = false;
 	return 0;
 }
 

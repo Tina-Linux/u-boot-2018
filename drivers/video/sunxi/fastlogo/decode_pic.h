@@ -27,6 +27,7 @@ extern "C" {
 #include <linux/printk.h>
 #include "load_file.h"
 
+//#define FASTLOGO_DEBUG
 struct raw_pic_t;
 
 enum decode_type {
@@ -63,6 +64,9 @@ struct raw_pic_t {
 
 struct raw_pic_t *decode_pic(struct file_info_t *p_in_file,
 			     struct decode_out_arg *p_out_arg);
+
+int decode_pic2(struct file_info_t *p_in_file, struct raw_pic_t *p_pic,
+		enum decode_type type);
 
 #ifdef __cplusplus
 }

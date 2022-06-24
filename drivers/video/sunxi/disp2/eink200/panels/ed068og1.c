@@ -12,22 +12,22 @@
 [eink]
 eink_panel_name     = "default_eink"
 eink_scan_mode	    = 0
-eink_width          = 800
-eink_height         = 600
+eink_width          = 1440
+eink_height         = 1080
 eink_bits	    = 4
-eink_data_len	    = 8
-eink_lsl	    = 10
-eink_lbl	    = 4
-eink_lel	    = 44
-eink_fsl	    = 5
-eink_fbl	    = 3
-eink_fel	    = 12
-eink_lgonl	    = 220
+eink_data_len	    = 16
+eink_lsl	    = 8
+eink_lbl	    = 8
+eink_lel	    = 84
+eink_fsl	    = 2
+eink_fbl	    = 4
+eink_fel	    = 5
+eink_lgonl	    = 180
 eink_gdck_sta	    = 8
 eink_gdoe_start_line= 2
 eink_fresh_hz       = 85
-eink_gray_level	    = 16
-eink_wav_path	    = "/system/default.awf"
+eink_gray_level	    = 32
+eink_wav_path	    = "/system/default_4_16.awf"
 ;eink_power	    = "vcc-lcd"
 ;eink_pin_power	    = "vcc-pd"
 
@@ -220,9 +220,9 @@ static void EINK_power_off(void)
 #endif
 }
 
-struct __eink_panel default_eink = {
+struct __eink_panel ed068og1 = {
 	/* panel driver name, must mach the eink_panel_name in sys_config.fex */
-	.name = "default_eink",
+	.name = "ed068og1",
 	.func = {
 		 .cfg_open_flow = EINK_open_flow,
 		 .cfg_close_flow = EINK_close_flow,

@@ -8,10 +8,11 @@
  * warranty of any kind, whether express or implied.
  */
 
-#ifndef __DEFAULT_EINK_H__
-#define __DEFAULT_EINK_H__
+#ifndef __K101_MM2QA01_A_H__
+#define __K101_MM2QA01_A_H__
 
-#include "panel_ctrl.h"
-extern struct __eink_panel default_eink;
+#include "panels.h"
+
+extern __lcd_panel_t K101_MM2QA01_A_mipi_panel;
 
 #endif

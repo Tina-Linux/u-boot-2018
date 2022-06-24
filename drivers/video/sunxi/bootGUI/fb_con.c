@@ -222,7 +222,10 @@ static int creat_framebuffer(framebuffer_t *fb, const fb_config_t *const fb_cfg)
 
 	fb->cv->width = fb_cfg->width;
 	fb->cv->height = fb_cfg->height;
-	if (32 == fb_cfg->bpp) {
+	if (16 == fb_cfg->bpp) {
+		fb->cv->bpp = 16;
+		fb->cv->pixel_format_name = "RGB565";
+	} else if (32 == fb_cfg->bpp) {
 		fb->cv->bpp = 32;
 		fb->cv->pixel_format_name = "ARGB8888";
 	} else if (24 == fb_cfg->bpp) {
@@ -317,6 +320,15 @@ static int setup_framebuffer(framebuffer_t *const fb)
 	return 0;
 }
 
+static int clear_framebuffer(framebuffer_t *const fb)
+{
+	fb->handle = hal_request_layer(fb->fb_id);
+	if (NULL == fb->handle || NULL == fb->cv->base)
+		return -1;
+	memset(fb->cv->base, 0x00, fb->buf_list->buf_size);
+	return 0;
+}
+
 static void get_fb_configs(fb_config_t *fb_cfgs, int fb_id)
 {
 	int node = get_disp_fdt_node();
@@ -346,6 +358,7 @@ int fb_init(void)
 			s_fb_list[id].fb_id = id;
 			if (creat_framebuffer(&s_fb_list[id], &fb_cfg))
 				continue;
+			clear_framebuffer(&s_fb_list[id]);
 			setup_framebuffer(&s_fb_list[id]);
 		} else {
 			printf("bad fb%d_cfg[w=%d,h=%d,bpp=%d,format=%d]\n", id,

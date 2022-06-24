@@ -33,6 +33,8 @@ else ifeq ($(CONFIG_MACH_SUN8IW20),y)
 obj-y += de_lcd_sun50iw10.o
 else ifeq ($(CONFIG_MACH_SUN20IW1),y)
 obj-y += de_lcd_sun50iw10.o
+else ifeq ($(CONFIG_MACH_SUN8IW21),y)
+obj-y += de_lcd_sun50iw10.o
 else
 obj-y += de_lcd.o
 endif

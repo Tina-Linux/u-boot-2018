@@ -138,7 +138,10 @@ static inline void _get_screen_size(int sel, unsigned int *width, unsigned int *
 
 static inline void _get_fb_format_config(int fmt_cfg, int *bpp)
 {
-	if (8 == fmt_cfg) {
+	if (10 == fmt_cfg) {
+		/* DISP_FORMAT_RGB_565; */
+		*bpp = 16;
+	} else if (8 == fmt_cfg) {
 		/* DISP_FORMAT_RGB_888; */
 		*bpp = 24;
 	} else {
@@ -221,6 +224,10 @@ static inline void _set_layer_geometry(void *layer_config,
 		layer->info.alpha_mode = 0x1;
 		layer->info.alpha_value = 0xFF;
 		layer->info.fb.format = DISP_FORMAT_RGB_888;
+	}  else if (16 == bpp) {
+		layer->info.alpha_mode = 0x1;
+		layer->info.alpha_value = 0xFF;
+		layer->info.fb.format = DISP_FORMAT_RGB_565;
 	} else {
 		printf("%s: no support the bpp[%d]\n", __func__, bpp);
 		layer->info.alpha_mode = 0x0;

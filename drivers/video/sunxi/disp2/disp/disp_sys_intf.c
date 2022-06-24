@@ -378,6 +378,7 @@ int disp_get_set_lcd_param_index_from_flash(bool is_set, int idx)
 			ret = -1;
 		}
 	} else {
+#ifdef CONFIG_COMPATIBLE_PANEL_RECORD
 #ifdef CONFIG_FAT_WRITE
 		if (idx < 0 || idx > 9) {
 			ret = -1;
@@ -398,6 +399,9 @@ int disp_get_set_lcd_param_index_from_flash(bool is_set, int idx)
 #else
 		pr_error("please enable FAT_WRITE for lcd compatible first\n");
 		ret = -1;
+#endif
+#else
+		ret = idx_get = idx;
 #endif
 }
 exit_free:

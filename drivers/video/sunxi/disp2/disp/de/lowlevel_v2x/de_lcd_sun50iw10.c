@@ -121,8 +121,46 @@ s32 tcon1_tv_clk_enable(u32 sel, u32 en)
 	return 0;
 }
 
+/**
+ * tcon1_hdmi_clk_enable - enable tcon clk output to hdmi
+ * @sel: The index of tcon selected for hdmi source
+ * @en: Enable or not for tcon
+ *
+ * Returns 0.
+ */
 s32 tcon1_hdmi_clk_enable(u32 sel, u32 en)
 {
+	unsigned int tcon_index;
+
+	if (sel >= DEVICE_NUM)
+		return -1;
+	if (!de_feat_get_tcon_type(sel))
+		return -1;
+
+	tcon_index = de_feat_get_tcon_index(sel);
+	if (tcon_index < 0)
+		return -1;
+
+	if (tcon_index == 0)
+		lcd_top[0]->tcon_clk_gate.bits.tv0_clk_gate = en;
+	else
+		lcd_top[0]->tcon_clk_gate.bits.tv1_clk_gate = en;
+
+	if (en) {
+		if (tcon_index == 0)
+			lcd_top[0]->tcon_clk_gate.bits.hdmi_src = 1;
+		else if (tcon_index == 1)
+			lcd_top[0]->tcon_clk_gate.bits.hdmi_src = 2;
+	} else {
+		/* disable tcon output to hdmi */
+		if (((tcon_index == 0)
+		     && (lcd_top[0]->tcon_clk_gate.bits.hdmi_src == 1))
+		    || ((tcon_index == 1)
+			&& (lcd_top[0]->tcon_clk_gate.bits.hdmi_src == 2))) {
+			lcd_top[0]->tcon_clk_gate.bits.hdmi_src = 0;
+		}
+	}
+
 	return 0;
 }
 
@@ -355,7 +393,7 @@ s32 lvds_open(u32 sel, disp_panel_para *panel)
 #if defined(SUPPORT_COMBO_DPHY)
 		if (sel == 0) {
 			lvds_combphy_open(sel, panel);
-		} else {
+		} else if (sel < DEVICE_NUM) {
 			lcd_dev[sel]->tcon0_lvds_ana[0].bits.c = 2;
 			lcd_dev[sel]->tcon0_lvds_ana[0].bits.v = 3;
 			lcd_dev[sel]->tcon0_lvds_ana[0].bits.pd = 2;
@@ -736,6 +774,7 @@ static s32 tcon0_cfg_mode_tri(u32 sel, disp_panel_para *panel)
 {
 	u32 start_delay = 0;
 	u32 de_clk_rate = de_get_clk_rate() / 1000000;
+	u32 delay_line = 0;
 
 	de_clk_rate = (de_clk_rate == 0) ? 250 : de_clk_rate;
 
@@ -745,8 +784,30 @@ static s32 tcon0_cfg_mode_tri(u32 sel, disp_panel_para *panel)
 	lcd_dev[sel]->tcon0_cpu_tri1.bits.block_num = panel->lcd_y - 1;
 	lcd_dev[sel]->tcon0_cpu_tri2.bits.trans_start_mode = 0;
 	lcd_dev[sel]->tcon0_cpu_tri2.bits.sync_mode = 0;
-	start_delay = (panel->lcd_vt - panel->lcd_y - 8 - 1)
-	    * panel->lcd_ht * de_clk_rate / panel->lcd_dclk_freq / 8;
+
+	/**
+	 * When the blanking area of LCD is too small, the following formula is
+	 * not applicable, that calculates the start_ Delay is too large.
+	 *
+	 * The formula is
+	 * 		start_delay = (panel->lcd_vt - panel->lcd_y - 8 - 1)
+	 *    			* panel->lcd_ht * de_clk_rate / panel->lcd_dclk_freq / 8;
+	 *
+	 * Therefore, the following formula is obtained by balancing the
+	 * requirements of DE, TCON and PANEL modules for pixel data speed
+	 *
+	 */
+	if (panel->lcd_vbp > 10)
+		delay_line = 10;
+	else if (panel->lcd_vbp <= 10 && panel->lcd_vbp > 4)
+		delay_line = panel->lcd_vbp - 1;
+	else {
+		DE_WRN("vbp is too small, please readjust the timing parameters to increase vbp. \n");
+		delay_line = panel->lcd_vbp;
+	}
+
+	start_delay = delay_line * panel->lcd_ht * de_clk_rate / panel->lcd_dclk_freq / 8;
+
 	lcd_dev[sel]->tcon0_cpu_tri2.bits.start_delay = start_delay;
 
 	lcd_dev[sel]->tcon0_cpu_ctl.bits.trigger_fifo_en = 1;
@@ -1339,6 +1400,88 @@ s32 tcon1_cfg_ex(u32 sel, disp_panel_para *panel)
 
 s32 tcon1_hdmi_color_remap(u32 sel, u32 onoff, u32 is_yuv)
 {
+#if defined(CONFIG_MACH_SUN8IW12)
+	if (is_yuv) {
+		lcd_dev[sel]->tcon_ceu_coef_rr.bits.value = 0;
+		lcd_dev[sel]->tcon_ceu_coef_rg.bits.value = 0;
+		lcd_dev[sel]->tcon_ceu_coef_rb.bits.value = 0x100;
+		lcd_dev[sel]->tcon_ceu_coef_rc.bits.value = 0;
+
+		lcd_dev[sel]->tcon_ceu_coef_gr.bits.value = 0;
+		lcd_dev[sel]->tcon_ceu_coef_gg.bits.value = 0x100;
+		lcd_dev[sel]->tcon_ceu_coef_gb.bits.value = 0;
+		lcd_dev[sel]->tcon_ceu_coef_gc.bits.value = 0;
+
+		lcd_dev[sel]->tcon_ceu_coef_br.bits.value = 0x100;
+		lcd_dev[sel]->tcon_ceu_coef_bg.bits.value = 0;
+		lcd_dev[sel]->tcon_ceu_coef_bb.bits.value = 0;
+		lcd_dev[sel]->tcon_ceu_coef_bc.bits.value = 0;
+
+		lcd_dev[sel]->tcon_ceu_coef_rv.bits.max = 255;
+		lcd_dev[sel]->tcon_ceu_coef_rv.bits.min = 0;
+		lcd_dev[sel]->tcon_ceu_coef_gv.bits.max = 255;
+		lcd_dev[sel]->tcon_ceu_coef_gv.bits.min = 0;
+		lcd_dev[sel]->tcon_ceu_coef_bv.bits.max = 255;
+		lcd_dev[sel]->tcon_ceu_coef_bv.bits.min = 0;
+	} else {
+		lcd_dev[sel]->tcon_ceu_coef_rr.bits.value = 0x100;
+		lcd_dev[sel]->tcon_ceu_coef_rg.bits.value = 0;
+		lcd_dev[sel]->tcon_ceu_coef_rb.bits.value = 0;
+		lcd_dev[sel]->tcon_ceu_coef_rc.bits.value = 0;
+
+		lcd_dev[sel]->tcon_ceu_coef_gr.bits.value = 0;
+		lcd_dev[sel]->tcon_ceu_coef_gg.bits.value = 0;
+		lcd_dev[sel]->tcon_ceu_coef_gb.bits.value = 0x100;
+		lcd_dev[sel]->tcon_ceu_coef_gc.bits.value = 0;
+
+		lcd_dev[sel]->tcon_ceu_coef_br.bits.value = 0;
+		lcd_dev[sel]->tcon_ceu_coef_bg.bits.value = 0x100;
+		lcd_dev[sel]->tcon_ceu_coef_bb.bits.value = 0;
+		lcd_dev[sel]->tcon_ceu_coef_bc.bits.value = 0;
+
+		lcd_dev[sel]->tcon_ceu_coef_rv.bits.max = 255;
+		lcd_dev[sel]->tcon_ceu_coef_rv.bits.min = 0;
+		lcd_dev[sel]->tcon_ceu_coef_gv.bits.max = 255;
+		lcd_dev[sel]->tcon_ceu_coef_gv.bits.min = 0;
+		lcd_dev[sel]->tcon_ceu_coef_bv.bits.max = 255;
+		lcd_dev[sel]->tcon_ceu_coef_bv.bits.min = 0;
+	}
+	lcd_dev[sel]->tcon_ceu_ctl.bits.ceu_en = 1;
+#else
+	/*
+	 * plane sequence:
+	 * v: 16~240
+	 * y: 16~235
+	 * u: 16~240
+	 */
+	lcd_dev[sel]->tcon_ceu_coef_rr.bits.value = 0;
+	lcd_dev[sel]->tcon_ceu_coef_rg.bits.value = 0;
+	lcd_dev[sel]->tcon_ceu_coef_rb.bits.value = 0x100;
+	lcd_dev[sel]->tcon_ceu_coef_rc.bits.value = 0;
+
+	lcd_dev[sel]->tcon_ceu_coef_gr.bits.value = 0x100;
+	lcd_dev[sel]->tcon_ceu_coef_gg.bits.value = 0;
+	lcd_dev[sel]->tcon_ceu_coef_gb.bits.value = 0;
+	lcd_dev[sel]->tcon_ceu_coef_gc.bits.value = 0;
+
+	lcd_dev[sel]->tcon_ceu_coef_br.bits.value = 0;
+	lcd_dev[sel]->tcon_ceu_coef_bg.bits.value = 0x100;
+	lcd_dev[sel]->tcon_ceu_coef_bb.bits.value = 0;
+	lcd_dev[sel]->tcon_ceu_coef_bc.bits.value = 0;
+
+	lcd_dev[sel]->tcon_ceu_coef_rv.bits.max = 240;
+	lcd_dev[sel]->tcon_ceu_coef_rv.bits.min = 16;
+	lcd_dev[sel]->tcon_ceu_coef_gv.bits.max = 235;
+	lcd_dev[sel]->tcon_ceu_coef_gv.bits.min = 16;
+	lcd_dev[sel]->tcon_ceu_coef_bv.bits.max = 240;
+	lcd_dev[sel]->tcon_ceu_coef_bv.bits.min = 16;
+
+	if (onoff)
+		lcd_dev[sel]->tcon_ceu_ctl.bits.ceu_en = 1;
+	else
+		lcd_dev[sel]->tcon_ceu_ctl.bits.ceu_en = 0;
+
+#endif
 	return 0;
 }
 
@@ -1398,6 +1541,8 @@ s32 tcon1_set_timming(u32 sel, struct disp_video_timings *timming)
 	lcd_dev[sel]->tcon1_io_tri.bits.io3_output_tri_en = 1;
 	lcd_dev[sel]->tcon1_io_tri.bits.data_output_tri_en = 0xffffff;
 #endif
+	/*select the source of hdmi*/
+	lcd_dev[0]->tcon_mul_ctl.bits.hdmi_src = sel;
 	return 0;
 }
 

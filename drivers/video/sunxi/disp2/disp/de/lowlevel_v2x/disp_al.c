@@ -482,6 +482,25 @@ int disp_al_manager_apply(unsigned int disp, struct disp_manager_data *data)
 		    | (back_color->green << 8) | (back_color->blue << 0);
 	}
 
+	if (al_priv.output_type[al_priv.tcon_id[disp]] ==
+	    (u32)DISP_OUTPUT_TYPE_HDMI) {
+
+#ifdef BYPASS_TCON_CEU
+		tcon1_hdmi_color_remap(al_priv.tcon_id[disp], 0,
+				data->config.cs);
+#else
+		/*
+		 * If yuv output(cs != 0), remap yuv plane to (v y u) sequency
+		 * else disable color remap function
+		 */
+		if (data->config.cs != 0)
+			tcon1_hdmi_color_remap(al_priv.tcon_id[disp], 1,
+					data->config.cs);
+		else
+			tcon1_hdmi_color_remap(al_priv.tcon_id[disp], 0,
+					data->config.cs);
+#endif
+	}
 	de_update_clk_rate(data->config.de_freq);
 
 	return de_al_mgr_apply(disp, data);
@@ -750,6 +769,11 @@ int disp_al_lcd_cfg(u32 screen_id, disp_panel_para *panel,
 
 	tcon_init(screen_id);
 	disp_al_lcd_get_clk_info(screen_id, &info, panel);
+	if (panel->tcon_clk_div_ajust.clk_div_increase_or_decrease == INCREASE) {
+		info.tcon_div = info.tcon_div * panel->tcon_clk_div_ajust.div_multiple;
+	} else if (panel->tcon_clk_div_ajust.clk_div_increase_or_decrease == DECREASE) {
+		info.tcon_div = info.tcon_div / panel->tcon_clk_div_ajust.div_multiple;
+	}
 	tcon0_set_dclk_div(screen_id, info.tcon_div);
 
 #if !defined(TCON1_DRIVE_PANEL)
@@ -1000,6 +1024,70 @@ int disp_al_lcd_get_start_delay(u32 screen_id, disp_panel_para *panel)
 #endif
 		return tcon_get_start_delay(screen_id,
 					    al_priv.tcon_type[screen_id]);
+}
+
+/* hdmi */
+int disp_al_hdmi_enable(u32 screen_id)
+{
+	tcon1_hdmi_clk_enable(screen_id, 1);
+
+	tcon1_open(screen_id);
+	return 0;
+}
+
+int disp_al_hdmi_disable(u32 screen_id)
+{
+	al_priv.output_type[screen_id] = (u32)DISP_OUTPUT_TYPE_NONE;
+
+	tcon1_close(screen_id);
+	tcon_exit(screen_id);
+	tcon1_hdmi_clk_enable(screen_id, 0);
+
+	return 0;
+}
+
+int disp_al_hdmi_cfg(u32 screen_id, struct disp_video_timings *video_info)
+{
+	al_priv.output_type[screen_id] = (u32)DISP_OUTPUT_TYPE_HDMI;
+	al_priv.output_mode[screen_id] = (u32)video_info->vic;
+	al_priv.output_fps[screen_id] =
+	    video_info->pixel_clk / video_info->hor_total_time /
+	    video_info->ver_total_time * (video_info->b_interlace +
+					  1) / (video_info->trd_mode + 1);
+	al_priv.tcon_type[screen_id] = 1;
+
+	de_update_device_fps(al_priv.de_id[screen_id],
+			     al_priv.output_fps[screen_id]);
+
+	tcon_init(screen_id);
+	tcon1_set_timming(screen_id, video_info);
+#if defined(DISP2_TCON_TV_SYNC_POL_ISSUE)
+	tcon_set_sync_pol(screen_id, !video_info->ver_sync_polarity,
+			  !video_info->hor_sync_polarity);
+#endif /*endif DISP2_TCON_TV_SYNC_POL_ISSUE */
+
+#ifdef TCON_POL_CORRECT
+	tcom1_cfg_correct(screen_id, video_info);
+#endif
+
+#ifdef BYPASS_TCON_CEU
+	tcon1_hdmi_color_remap(screen_id, 0,
+			al_priv.output_cs[screen_id]);
+#else
+	/*
+	 * If yuv output(cs != 0), remap yuv plane to (v y u) sequency
+	 * else disable color remap function
+	 */
+	if (al_priv.output_cs[screen_id] != 0)
+		tcon1_hdmi_color_remap(screen_id, 1,
+				       al_priv.output_cs[screen_id]);
+	else
+		tcon1_hdmi_color_remap(screen_id, 0,
+				       al_priv.output_cs[screen_id]);
+#endif
+	tcon1_src_select(screen_id, LCD_SRC_DE, al_priv.de_id[screen_id]);
+
+	return 0;
 }
 
 /* tv */
@@ -1300,7 +1388,11 @@ int disp_init_al(disp_bsp_init_para *para)
 		al_priv.output_type[tcon_id] = para->boot_info.type;
 		al_priv.output_mode[tcon_id] = para->boot_info.mode;
 		al_priv.tcon_type[tcon_id] = 0;
-
+#if defined(SUPPORT_HDMI)
+		al_priv.tcon_type[tcon_id] =
+		    (para->boot_info.type == DISP_OUTPUT_TYPE_HDMI) ?
+		    1 : al_priv.tcon_type[tcon_id];
+#endif
 #if defined(SUPPORT_TV)
 		al_priv.tcon_type[tcon_id] =
 		    (para->boot_info.type == DISP_OUTPUT_TYPE_TV) ?

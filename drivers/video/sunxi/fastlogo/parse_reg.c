@@ -210,7 +210,8 @@ int __write_reg(struct reg_data_info_t *p_reg_info)
 	int i = 0;
 	__u32 temp_val = 0;
 
-	if (!p_reg_info) {
+	if (!p_reg_info || !p_reg_info->reg_number || !p_reg_info->p_info ||
+	    !p_reg_info->p_reg_set) {
 		parse_reg_wrn("Null pointer!\n");
 		return -1;
 	}

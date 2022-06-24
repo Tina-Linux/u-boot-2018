@@ -1057,6 +1057,84 @@ static const struct de_feat sun8iw12_de_features = {
 };
 #endif
 
+#if defined(CONFIG_MACH_SUN8IW21)
+static const int sun8iw21_de_num_chns[] = {
+	/* DISP0 */
+	3,
+};
+
+static const int sun8iw21_de_num_vi_chns[] = {
+	/* DISP0 */
+	2,
+};
+
+static const int sun8iw21_de_num_layers[] = {
+	/* DISP0 CH0 */
+	4,
+	/* DISP0 CH1 */
+	4,
+	/* DISP0 CH2 */
+	4,
+};
+
+static const int sun8iw21_de_is_support_vep[] = {
+	/* DISP0 CH0 */
+	1,			/*not support common vep but fcm*/
+	/* DISP0 CH1 */
+	0,
+	/* DISP0 CH2 */
+	0,
+};
+
+static const int sun8iw21_de_is_support_smbl[] = {/*FIXME not support smbl need to fix dcsc*/
+	/* CH0 */
+	1,
+};
+
+static const int sun8iw21_de_supported_output_types[] = {
+	/* DISP0 */
+	DE_OUTPUT_TYPE_LCD,
+};
+
+static const int sun8iw21_de_is_support_wb[] = {
+	/* DISP0 */
+	1,
+};
+
+static const int sun8iw21_de_is_support_scale[] = {
+	/* DISP0 CH0 */
+	1,
+	/* DISP0 CH1 */
+	1,
+	/* DISP0 CH2 */
+	0,
+};
+
+static const int sun8iw21_de_scale_line_buffer[] = {
+	/* DISP0 CH0 */
+	2048,
+	/* DISP0 CH1 */
+	2048,
+	/* DISP0 CH2 */
+	0,
+};
+
+static const struct de_feat sun8iw21_de_features = {
+	.num_screens = DE_NUM,
+	.num_devices = DEVICE_NUM,
+	.num_chns = sun8iw21_de_num_chns,
+	.num_vi_chns = sun8iw21_de_num_vi_chns,
+	.num_layers = sun8iw21_de_num_layers,
+	.is_support_vep = sun8iw21_de_is_support_vep,
+	.is_support_smbl = sun8iw21_de_is_support_smbl,
+	.is_support_wb = sun8iw21_de_is_support_wb,
+	.supported_output_types = sun8iw21_de_supported_output_types,
+	.is_support_scale = sun8iw21_de_is_support_scale,
+	.scale_line_buffer_yuv = sun8iw21_de_scale_line_buffer,
+	.scale_line_buffer_rgb = sun8iw21_de_scale_line_buffer,
+	.scale_line_buffer_ed = sun8iw21_de_scale_line_buffer,
+};
+#endif
 #if defined(CONFIG_MACH_SUN8IW17)
 static const int sun8iw17_de_num_chns[] = {
 	/* DISP0 */
@@ -1686,6 +1764,8 @@ int de_feat_init(void)
 	de_cur_features = &sun8iw15_de_features;
 #elif defined(CONFIG_MACH_SUN8IW20) || defined(CONFIG_MACH_SUN20IW1)
 	de_cur_features = &sun8iw20_de_features;
+#elif defined(CONFIG_MACH_SUN8IW21)
+	de_cur_features = &sun8iw21_de_features;
 #else
 #error "undefined platform!!!"
 #endif

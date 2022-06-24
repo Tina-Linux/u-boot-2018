@@ -12,22 +12,22 @@
 [eink]
 eink_panel_name     = "default_eink"
 eink_scan_mode	    = 0
-eink_width          = 800
-eink_height         = 600
-eink_bits	    = 4
+eink_width          = 1024
+eink_height         = 758
+eink_bits	    = 5
 eink_data_len	    = 8
-eink_lsl	    = 10
-eink_lbl	    = 4
-eink_lel	    = 44
-eink_fsl	    = 5
-eink_fbl	    = 3
-eink_fel	    = 12
-eink_lgonl	    = 220
-eink_gdck_sta	    = 8
+eink_lsl	    = 6
+eink_lbl	    = 6
+eink_lel	    = 38
+eink_fsl	    = 2
+eink_fbl	    = 4
+eink_fel	    = 5
+eink_lgonl	    = 262
+eink_gdck_sta	    = 4
 eink_gdoe_start_line= 2
 eink_fresh_hz       = 85
 eink_gray_level	    = 16
-eink_wav_path	    = "/system/default.awf"
+eink_wav_path	    = "/system/default_8_5.awf"
 ;eink_power	    = "vcc-lcd"
 ;eink_pin_power	    = "vcc-pd"
 
@@ -220,9 +220,9 @@ static void EINK_power_off(void)
 #endif
 }
 
-struct __eink_panel default_eink = {
+struct __eink_panel es103tc1c1 = {
 	/* panel driver name, must mach the eink_panel_name in sys_config.fex */
-	.name = "default_eink",
+	.name = "es103tc1c1",
 	.func = {
 		 .cfg_open_flow = EINK_open_flow,
 		 .cfg_close_flow = EINK_close_flow,

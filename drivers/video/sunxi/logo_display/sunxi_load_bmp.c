@@ -19,6 +19,7 @@
 #include <sys_partition.h>
 #include <fdt_support.h>
 
+static void *bmp_addr;
 extern int sunxi_partition_get_partno_byname(const char *part_name);
 
 static int malloc_bmp_mem(char **buff, int size)
@@ -43,8 +44,10 @@ static void update_disp_reserve(unsigned int size, void *addr)
 #endif
 }
 
-static int board_display_update_para_for_kernel(char *name, int value)
+int save_bmp_logo_to_kernel(void)
 {
+	char name[] = "fb_base";
+	int value = (int)bmp_addr;
 #ifndef CONFIG_SUNXI_MULITCORE_BOOT
 	int node;
 	int ret = -1;
@@ -122,6 +125,7 @@ int fat_read_logo_to_kernel(char *name)
 
 	memcpy(bmp_buff, bmp_head_addr, bmp_head_addr->file_size);
 	update_disp_reserve(bmp_head_addr->file_size, (void *)bmp_buff);
+	bmp_addr = (void *)bmp_buff;
 #endif
 	return ret;
 }
@@ -193,7 +197,7 @@ int read_bmp_to_kernel(char *partition_name)
 	/*read logo.bmp all info*/
 	update_disp_reserve(rblock * 512, (void *)align_addr);
 	ret = sunxi_flash_read(start_block, rblock, align_addr);
-	board_display_update_para_for_kernel("fb_base", (uint)align_addr);
+	bmp_addr = (void *)align_addr;
 	return 0;
 
 }

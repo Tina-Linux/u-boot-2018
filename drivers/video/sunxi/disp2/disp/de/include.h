@@ -658,6 +658,16 @@ enum disp_lcd_dsi_port {
 	DISP_LCD_DSI_DUAL_PORT,
 };
 
+enum div_flag {
+	 INCREASE        = 1,
+	 DECREASE        = -1,
+};
+
+struct clk_div_ajust {
+	enum div_flag clk_div_increase_or_decrease;
+	int div_multiple;
+};
+
 typedef struct {
 	disp_lcd_if              lcd_if;
 
@@ -737,6 +747,7 @@ typedef struct {
 	unsigned int            ccir_clk_div; /*not need to config for user*/
 	unsigned int            input_csc;
 	unsigned int lcd_hv_data_polarity;
+	struct clk_div_ajust tcon_clk_div_ajust;
 } disp_panel_para;
 
 typedef enum {

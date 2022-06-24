@@ -123,6 +123,10 @@ __lcd_panel_t* panel_array[] = {
 	&st7701s_panel,
 #endif
 
+#ifdef CONFIG_LCD_SUPPORT_ST7701S_G5
+	&st7701s_g5_panel,
+#endif
+
 #ifdef CONFIG_LCD_SUPPORT_WTL096601G03
 	&wtl096601g03_panel,
 #endif
@@ -159,10 +163,27 @@ __lcd_panel_t* panel_array[] = {
 	&jd9366ab_3_panel,
 #endif
 
+#ifdef CONFIG_LCD_SUPPORT_JD9161Z_MIPI
+	&jd9161z_panel,
+#endif
+
 #ifdef CONFIG_LCD_SUPPORT_TFT08006
 	&tft08006_panel,
 #endif
 
+#ifdef CONFIG_LCD_SUPPORT_T050K589
+	&t050k589_panel,
+#endif
+
+#ifdef CONFIG_LCD_SUPPORT_K101_MM2QA01_A
+	&K101_MM2QA01_A_mipi_panel,
+#endif
+#ifdef CONFIG_LCD_SUPPORT_ICN6202
+	&icn6202_panel,
+#endif
+#ifdef CONFIG_LCD_SUPPORT_NT35510_MIPI
+	&nt35510_panel,
+#endif
 	/* add new panel below */
 
 	NULL,

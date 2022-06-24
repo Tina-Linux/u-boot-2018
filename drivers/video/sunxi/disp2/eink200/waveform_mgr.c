@@ -398,7 +398,7 @@ int get_waveform_data(enum upd_mode mode, u32 temp, u32 *total_frames, unsigned 
 	p_mode_temp_addr = (u8 *)p_mode_virt_addr + mode_temp_offset;
 
 	*total_frames = *((u16 *)p_mode_temp_addr);
-	mode_temp_offset = mode_temp_offset + 4;		//skip total frame(2 Byte) and dividor(2 Byte)
+	mode_temp_offset = mode_temp_offset + 16; //total frame(2 Byte) and dividor(2 Byte) wav paddr must 16byte align
 
 	*wf_paddr = p_mode_phy_addr + mode_temp_offset;
 	*wf_vaddr = (unsigned long)(p_mode_virt_addr + mode_temp_offset);
@@ -509,8 +509,12 @@ int init_waveform(const char *path, u32 bit_num)
 
 	u32 *pAddr = NULL;
 
-	size_t waveform_buff_len = 10 << 20;/* 10M */
+	if (!path) {
+		pr_err("path is null\n");
+		return -1;
+	}
 
+	size_t waveform_buff_len = 10 << 20;/* 10M */
 	char *waveform_argv[6] = { "fatload", "sunxi_flash", "0:0", "00000000", waveform_path, NULL };
 
 	partno = sunxi_partition_get_partno_byname("bootloader");
@@ -518,20 +522,14 @@ int init_waveform(const char *path, u32 bit_num)
 		partno = sunxi_partition_get_partno_byname("boot-resource");
 		if (partno < 0) {
 			printf("[%s]:Get bootloader or boot-resource partition number fail!\n", __func__);
-		} else
-			//sprintf(waveform_argv[2], "%x:0", partno);
-			sprintf(waveform_argv[2], "0:%x", partno);
+			return -1;
+		}
 	}
 
 	EINK_INFO_MSG("partno = %d\n", partno);
-
-	if (!path) {
-		pr_err("path is null\n");
-		return -1;
-	}
+	sprintf(waveform_argv[2], "0:%x", partno);
 
 	memset(&g_waveform_file, 0, sizeof(g_waveform_file));
-
 	EINK_INFO_MSG("starting to load awf waveform file(%s)\n", path);
 	g_waveform_file.p_wf_vaddr = (char *)malloc_aligned(waveform_buff_len, ARCH_DMA_MINALIGN);
 

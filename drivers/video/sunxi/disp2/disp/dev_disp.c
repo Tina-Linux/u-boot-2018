@@ -10,26 +10,11 @@
  * published by the Free Software Foundation.
 */
 
-#include <linux/kernel.h>
-#include <linux/io.h>
 #include "dev_disp.h"
 
 disp_drv_info g_disp_drv;
 
 #define MY_BYTE_ALIGN(x) ( ( (x + (4*1024-1)) >> 12) << 12)             /* alloc based on 4K byte */
-
-#define PHY_BASE      0x05510000
-#define PHY_CTL0      0x0040
-#define PHY_CTL5      0x0054
-#define PLL_CTL1      0x005c
-#define PLL_CTL0      0x0058
-
-#define _CCMU_BASE    0x02001000
-#define _PLL_VIDEO1   0x0048
-#define _TCON_TV      0x0B80
-#define _DPSS_TOP     0x0ABC
-#define _HDMI_CLK     0x0B04
-#define _HDMI_BGR     0x0B1C
 
 static u32 suspend_output_type[2] = {0,0};
 static u32 suspend_status = 0;//0:normal; suspend_status&1 != 0:in early_suspend; suspend_status&2 != 0:in suspend;
@@ -252,6 +237,19 @@ static s8 drv_lcd_check_close_finished(u32 sel)
 	return 1;
 }
 
+#if defined(SUPPORT_HDMI)
+s32 disp_set_hdmi_func(struct disp_device_func * func)
+{
+	return bsp_disp_set_hdmi_func(func);
+}
+
+s32 disp_set_hdmi_detect(bool hpd)
+{
+	return bsp_disp_hdmi_set_detect(hpd);
+}
+EXPORT_SYMBOL(disp_set_hdmi_detect);
+#endif
+
 #if defined(SUPPORT_EDP)
 s32 disp_set_edp_func(struct disp_tv_func *func)
 {
@@ -364,6 +362,7 @@ int disp_draw_colorbar(u32 disp)
 	return ret;
 }
 
+extern __s32 hdmi_init(void);
 extern __s32 tv_init(void);
 extern int tv_ac200_init(void);
 extern void disp_fdt_init(void);
@@ -639,47 +638,10 @@ s32 drv_disp_init(void)
 
 #endif
 	lcd_init();
-
-	u32 rvalue;
-	void __iomem *phy_base;
-	void __iomem *_ccmu_base;
-
-	phy_base = ioremap(PHY_BASE, 0X5C);
-	_ccmu_base = ioremap(_CCMU_BASE, 0XB84);
-
-	writel(0xA8006203, _ccmu_base + _PLL_VIDEO1);
-
-	rvalue = readl(_ccmu_base + _TCON_TV);
-	rvalue &= ~(0x5 << 24);
-	rvalue |= (0x1 << 25);
-	writel(rvalue, _ccmu_base + _TCON_TV);
-
-	writel(0x00010001, _ccmu_base + _DPSS_TOP);
-	writel(0x80000000, _ccmu_base + _HDMI_CLK);
-	writel(0x00030001, _ccmu_base + _HDMI_BGR);
-
-	rvalue = readl(phy_base + PHY_CTL0);
-	rvalue &= ~(0x7 << 16);
-	rvalue &= ~(0xFF << 20);
-	writel(rvalue, phy_base + PHY_CTL0);
-
-	rvalue = readl(phy_base + PHY_CTL5);
-	rvalue &= ~(0x3);
-	rvalue &= ~(0x7F << 4);
-	writel(rvalue, phy_base + PHY_CTL5);
-
-	rvalue = readl(phy_base + PLL_CTL1);
-	rvalue |= (0x1 << 11);
-	rvalue &= ~(0x1 << 12);
-	writel(rvalue, phy_base + PLL_CTL1);
-
-	rvalue = readl(phy_base + PLL_CTL0);
-	rvalue &= ~(0x1 << 28);
-	writel(rvalue, phy_base + PLL_CTL0);
-
-	iounmap(phy_base);
-	iounmap(_ccmu_base);
-
+#if defined(SUPPORT_HDMI) && (defined(CONFIG_HDMI_DISP2_SUNXI) || \
+				defined(CONFIG_HDMI2_DISP2_SUNXI))
+	hdmi_init();
+#endif
 #if defined(SUPPORT_TV) && defined(CONFIG_TV_DISP2_SUNXI)
 	tv_init();
 #endif
@@ -1030,6 +992,17 @@ long disp_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 	//----layer----
 	case DISP_LAYER_SET_CONFIG:
 	{
+
+		const unsigned int lyr_cfg_size = ARRAY_SIZE(lyr_cfg);
+
+		if (IS_ERR_OR_NULL((void __user *)ubuffer[1])) {
+			__wrn("incoming pointer of user is ERR or NULL");
+			return -EFAULT;
+		}
+		if (ubuffer[2] == 0 || ubuffer[2] > lyr_cfg_size) {
+			__wrn("layer number need to be set from 1 to %d\n", lyr_cfg_size);
+			return -EFAULT;
+		}
 		if (copy_from_user(lyr_cfg,
 			(void __user *)ubuffer[1],
 			sizeof(struct disp_layer_config) * ubuffer[2]))	{
@@ -1043,6 +1016,17 @@ long disp_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 
 	case DISP_LAYER_GET_CONFIG:
 	{
+
+		const unsigned int lyr_cfg_size = ARRAY_SIZE(lyr_cfg);
+
+		if (IS_ERR_OR_NULL((void __user *)ubuffer[1])) {
+			__wrn("incoming pointer of user is ERR or NULL");
+			return -EFAULT;
+		}
+		if (ubuffer[2] == 0 || ubuffer[2] > lyr_cfg_size) {
+			__wrn("layer number need to be set from 1 to %d\n", lyr_cfg_size);
+			return -EFAULT;
+		}
 		if (copy_from_user(lyr_cfg,
 			(void __user *)ubuffer[1],
 			sizeof(struct disp_layer_config) * ubuffer[2]))	{
@@ -1064,6 +1048,17 @@ long disp_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 
 	case DISP_LAYER_SET_CONFIG2:
 	{
+
+		const unsigned int lyr_cfg_size = ARRAY_SIZE(lyr_cfg2);
+
+		if (IS_ERR_OR_NULL((void __user *)ubuffer[1])) {
+			__wrn("incoming pointer of user is ERR or NULL");
+			return -EFAULT;
+		}
+		if (ubuffer[2] == 0 || ubuffer[2] > lyr_cfg_size) {
+			__wrn("layer number need to be set from 1 to %d\n", lyr_cfg_size);
+			return -EFAULT;
+		}
 		if (copy_from_user(lyr_cfg2,
 		    (void __user *)ubuffer[1],
 		    sizeof(struct disp_layer_config2) * ubuffer[2])) {
@@ -1078,6 +1073,17 @@ long disp_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 
 	case DISP_LAYER_GET_CONFIG2:
 	{
+
+		const unsigned int lyr_cfg_size = ARRAY_SIZE(lyr_cfg2);
+
+		if (IS_ERR_OR_NULL((void __user *)ubuffer[1])) {
+			__wrn("incoming pointer of user is ERR or NULL");
+			return -EFAULT;
+		}
+		if (ubuffer[2] == 0 || ubuffer[2] > lyr_cfg_size) {
+			__wrn("layer number need to be set from 1 to %d\n", lyr_cfg_size);
+			return -EFAULT;
+		}
 		if (copy_from_user(lyr_cfg2,
 		    (void __user *)ubuffer[1],
 		    sizeof(struct disp_layer_config2) * ubuffer[2])) {
@@ -1158,7 +1164,35 @@ long disp_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 		break;
 	}
 
-		//---- tv ---
+	//---- hdmi ---
+	case DISP_HDMI_GET_HPD_STATUS:
+	if (DISPLAY_NORMAL == suspend_status)
+		ret = bsp_disp_hdmi_get_hpd_status(ubuffer[0]);
+	else
+		ret = 0;
+
+	break;
+	case DISP_HDMI_SUPPORT_MODE:
+	{
+		ret = bsp_disp_hdmi_check_support_mode(ubuffer[0], ubuffer[1]);
+		break;
+	}
+
+	case DISP_HDMI_GET_SUPPORT_MODE:
+	{
+		ret = bsp_disp_hdmi_get_support_mode(ubuffer[0], ubuffer[1]);
+		if (ret <= 0)
+			ret = ubuffer[1];
+		break;
+	}
+
+	case DISP_HDMI_GET_WORK_MODE:
+	{
+		ret = bsp_disp_hdmi_get_work_mode(ubuffer[0]);
+		break;
+	}
+
+	//---- tv ---
 	case DISP_SET_TV_HPD:
 	{
 		ret = bsp_disp_tv_set_hpd(ubuffer[0]);

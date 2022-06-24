@@ -33,7 +33,7 @@
    || defined(CONFIG_MACH_SUN8IW19) || defined(CONFIG_MACH_SUN8IW20)\
    || defined(CONFIG_MACH_SUN20IW1)
 #include "./lowlevel_v2x/de_feat.h"
-#elif defined(CONFIG_MACH_SUN8IW17)
+#elif defined(CONFIG_MACH_SUN8IW17) || defined(CONFIG_MACH_SUN8IW21)
 #include "./lowlevel_v2x/de_feat.h"
 #elif defined(CONFIG_MACH_SUN50IW1)
 #include "./lowlevel_sun50iw1/de_feat.h"

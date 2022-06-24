@@ -454,8 +454,11 @@ s32 dsi_dcs_rd(u32 sel, u8 cmd, u8 *para_p, u32 *num_p)
 		count++;
 		dsi_delay_us(100);
 	}
-	if (count >= 50)
+	if (count >= 50) {
 		dsi_dev[sel]->dsi_basic_ctl0.bits.inst_st = 0;
+		dsi_dev[sel]->dsi_gctl.bits.dsi_en = 0;
+		dsi_dev[sel]->dsi_gctl.bits.dsi_en = 1;
+	}
 
 	if (dsi_dev[sel]->dsi_cmd_ctl.bits.rx_flag) {
 		if (dsi_dev[sel]->dsi_cmd_ctl.bits.rx_overflow)
@@ -920,7 +923,6 @@ static s32 dsi_basic_cfg(u32 sel, disp_panel_para *panel)
 		dsi_dev[sel]->dsi_trans_zero.bits.hs_zero_reduce_set = 0;
 	} else {
 		s32 start_delay = panel->lcd_vt - panel->lcd_y - 10;
-		u32 vfp = panel->lcd_vt - panel->lcd_y - panel->lcd_vbp;
 		u32 dsi_start_delay;
 
 		/*
@@ -928,8 +930,7 @@ static s32 dsi_basic_cfg(u32 sel, disp_panel_para *panel)
 		 * set ready sync early to dramfreq, so set start_delay 1
 		 */
 		start_delay = 1;
-
-		dsi_start_delay = panel->lcd_vt - vfp + start_delay;
+		dsi_start_delay = start_delay;
 		if (dsi_start_delay > panel->lcd_vt)
 			dsi_start_delay -= panel->lcd_vt;
 		if (dsi_start_delay == 0)
