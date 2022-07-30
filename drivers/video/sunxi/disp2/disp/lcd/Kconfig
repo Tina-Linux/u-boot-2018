@@ -103,12 +103,6 @@ config LCD_SUPPORT_ST7701S
 	---help---
 		If you want to support ST7701S panel for display driver, select it.
 
-config LCD_SUPPORT_ST7701S_G5
-	bool "LCD support ST7701S_G5 panel"
-	default n
-	help
-		If you want to support ST7701S_G5 panel for display driver, select it.
-
 config LCD_SUPPORT_T30P106
 	bool "LCD support T30P106 panel"
 	default n
@@ -241,12 +235,6 @@ config LCD_SUPPORT_JD9366AB_3
 	---help---
 		If you want to support JD9366AB_3 panel for display driver, select it.
 
-config LCD_SUPPORT_JD9161Z_MIPI
-	bool "LCD support mipi_jd9161z panel"
-	default n
-	help
-		If you want to support mipi_jd9161z panel for display driver, select it.
-
 config LCD_SUPPORT_TFT08006
 	bool "LCD support TFT08006 panel"
 	default n
@@ -258,15 +246,3 @@ config LCD_SUPPORT_T050K589
 	default y
 	---help---
 		If you want to support T050K589 panel for display driver, select it.
-
-config LCD_SUPPORT_ICN6202
-	bool "LCD support icn6202 panel"
-	default n
-	---help---
-		If you want to support icn6202 panel for display driver, select it.
-
-config LCD_SUPPORT_NT35510_MIPI
-	bool "LCD support NT35510_mipi panel"
-	default n
-	---help---
-		If you want to support NT35510 panel for display driver, select it.

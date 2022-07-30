@@ -12,7 +12,15 @@
 #include <asm/arch/timer.h>
 #include <asm/arch/prcm.h>
 
-
+void rtc_set_vccio_det_spare(void)
+{
+	u32 val = 0;
+	val = readl(SUNXI_RTC_BASE + 0x1f4);
+	val &= ~(0xff << 4);
+	val |= (VCCIO_THRESHOLD_VOLTAGE_2_9 | FORCE_DETECTER_OUTPUT);
+	val &= ~VCCIO_DET_BYPASS_EN;
+	writel(val, SUNXI_RTC_BASE + 0x1f4);
+}
 
 void clock_init_uart(void)
 {
@@ -111,8 +119,8 @@ uint clock_get_corepll(void)
 		clock = 16;
 		break;
 	case 3://PLL_CPUX
+		div_p	 = 1<<((reg_val >>16) & 0x3);
 		reg_val  = readl(&ccm->pll1_cfg);
-		div_p    = 1<<((reg_val >>16) & 0x3);
 		factor_n = ((reg_val >> 8) & 0xff) + 1;
 		div_m    = ((reg_val >> 0) & 0x3) + 1;
 
@@ -222,33 +230,43 @@ uint clock_get_mbus(void)
 
 	return clock;
 }
-#if 0
+
 static int clk_get_pll_para(struct core_pll_freq_tbl *factor, int pll_clk)
 {
 	int index;
+	int index_p;
 
 	index = pll_clk / 24;
-	factor->FactorP = 0;
+	for (index_p = 0; index_p < 3; index_p++) {
+		factor->FactorP = index_p;
+		/* printf("pll_clk:%d  index:%d\n", pll_clk, index * 24 / (1 << index_p)); */
+		if (pll_clk == (index * 24 / (1 << index_p))) {
+			break;
+		}
+	}
+	if (index_p >= 3) {
+		factor->FactorP = 0;
+	}
 	factor->FactorN = (index - 1);
 	factor->FactorM = 0;
 
 	return 0;
 }
 
-
 int clock_set_corepll(int frequency)
 {
 	unsigned int reg_val = 0;
 	struct sunxi_ccm_reg *const ccm =
 		(struct sunxi_ccm_reg *)SUNXI_CCM_BASE;
-	struct sunxi_prcm_reg *const prcm =
-		(struct sunxi_prcm_reg *)SUNXI_PRCM_BASE;
 	struct core_pll_freq_tbl  pll_factor;
+
+	/*fix reset circuit detection threshold*/
+	rtc_set_vccio_det_spare();
 
 	if (frequency == clock_get_corepll())
 		return 0;
-	else if (frequency >= 1008)
-		frequency = 1008;
+	else if (frequency >= 1440)
+		frequency = 1440;
 
 
 	/* switch to 24M*/
@@ -258,33 +276,45 @@ int clock_set_corepll(int frequency)
 	__udelay(20);
 
 	/*pll output disable*/
-	reg_val = readl(&prcm->pll1_cfg);
-	reg_val &= ~(0x01 << 27);
-	writel(reg_val, &prcm->pll1_cfg);
+	reg_val = readl(&ccm->pll1_cfg);
+	reg_val &= ~(0x01 << 31);
+	writel(reg_val, &ccm->pll1_cfg);
 
 	/*get config para form freq table*/
 	clk_get_pll_para(&pll_factor, frequency);
 
-	reg_val = readl(&prcm->pll1_cfg);
+	reg_val = readl(&ccm->pll1_cfg);
 	reg_val &= ~((0xff << 8)  | (0x03 << 0));
-	reg_val |=  ((pll_factor.FactorN << 8) | (pll_factor.FactorM << 0));
-	writel(reg_val, &prcm->pll1_cfg);
+	reg_val |= (pll_factor.FactorN << 8) | (pll_factor.FactorM << 0) ;
+	writel(reg_val, &ccm->pll1_cfg);
+	__udelay(20);
+
+	reg_val = readl(&ccm->cpu_axi_cfg);
+	reg_val &= ~(0x03 << 16);
+	reg_val |= (pll_factor.FactorP << 16);
+	writel(reg_val, &ccm->cpu_axi_cfg);
 	__udelay(20);
 
 	/*enable lock*/
-	reg_val = readl(&prcm->pll1_cfg);
+	reg_val = readl(&ccm->pll1_cfg);
 	reg_val |=  (0x1 << 29);
-	writel(reg_val, &prcm->pll1_cfg);
+	writel(reg_val, &ccm->pll1_cfg);
+
+	/*enable pll*/
+	reg_val = readl(&ccm->pll1_cfg);
+	reg_val |=	(0x1 << 31);
+	writel(reg_val, &ccm->pll1_cfg);
+
 #ifndef FPGA_PLATFORM
 	do {
-		reg_val = readl(&prcm->pll1_cfg);
+		reg_val = readl(&ccm->pll1_cfg);
 	} while (!(reg_val & (0x1 << 28)));
 #endif
 
-	/*enable pll output*/
-	reg_val = readl(&prcm->pll1_cfg);
-	reg_val |=  (0x1 << 27);
-	writel(reg_val, &prcm->pll1_cfg);
+	/*disable lock*/
+	reg_val = readl(&ccm->pll1_cfg);
+	reg_val &= ~(0x1 << 29);
+	writel(reg_val, &ccm->pll1_cfg);
 
 	/* switch clk src to COREPLL*/
 	reg_val = readl(&ccm->cpu_axi_cfg);
@@ -294,7 +324,8 @@ int clock_set_corepll(int frequency)
 
 	return  0;
 }
-#endif
+
+
 int usb_open_clock(void)
 {
 	u32 reg_value = 0;

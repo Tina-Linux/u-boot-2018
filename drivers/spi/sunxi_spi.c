@@ -28,6 +28,8 @@
 #include <private_boot0.h>
 #include <private_toc.h>
 #include "../mtd/spi/sf_internal.h"
+#include <linux/sizes.h>
+#include <boot_param.h>
 
 #ifdef CONFIG_SPI_USE_DMA
 static sunxi_dma_set *spi_tx_dma;
@@ -79,8 +81,8 @@ static void spi_print_info(struct sunxi_spi_slave *sspi)
 			"[VER] 0x%02x = 0x%08x, [GCR] 0x%02x = 0x%08x, [TCR] 0x%02x = 0x%08x\n"
 			"[ICR] 0x%02x = 0x%08x, [ISR] 0x%02x = 0x%08x, [FCR] 0x%02x = 0x%08x\n"
 			"[FSR] 0x%02x = 0x%08x, [WCR] 0x%02x = 0x%08x, [CCR] 0x%02x = 0x%08x\n"
-			"[BCR] 0x%02x = 0x%08x, [TCR] 0x%02x = 0x%08x, [BCC] 0x%02x = 0x%08x\n"
-			"[DMA] 0x%02x = 0x%08x",
+			"[DCR] 0x%02x = 0x%08x, [BCR] 0x%02x = 0x%08x, [TCR] 0x%02x = 0x%08x\n"
+			"[BCC] 0x%02x = 0x%08x, [DMA] 0x%02x = 0x%08x",
 			sspi->base_addr,
 			SPI_VER_REG, readl(base_addr + SPI_VER_REG),
 			SPI_GC_REG, readl(base_addr + SPI_GC_REG),
@@ -92,8 +94,9 @@ static void spi_print_info(struct sunxi_spi_slave *sspi)
 			SPI_FIFO_STA_REG, readl(base_addr + SPI_FIFO_STA_REG),
 			SPI_WAIT_CNT_REG, readl(base_addr + SPI_WAIT_CNT_REG),
 			SPI_CLK_CTL_REG, readl(base_addr + SPI_CLK_CTL_REG),
-			SPI_BURST_CNT_REG, readl(base_addr + SPI_BURST_CNT_REG),
+			SPI_SDC_REG, readl(base_addr + SPI_SDC_REG),
 
+			SPI_BURST_CNT_REG, readl(base_addr + SPI_BURST_CNT_REG),
 			SPI_TRANSMIT_CNT_REG, readl(base_addr + SPI_TRANSMIT_CNT_REG),
 			SPI_BCC_REG, readl(base_addr + SPI_BCC_REG),
 			SPI_DMA_CTL_REG, readl(base_addr + SPI_DMA_CTL_REG));
@@ -231,6 +234,7 @@ static void spi_set_sample_delay(void __iomem  *base_addr,
 
 	rval |= sample_delay;
 	writel(rval, base_addr + SPI_SDC_REG);
+	mdelay(1);
 }
 
 /* config spi */
@@ -1210,37 +1214,37 @@ void sunxi_update_right_delay_para(struct mtd_info *mtd)
 	struct sunxi_spi_slave *sspi = to_sunxi_slave(slave);
 	void __iomem *base_addr = (void *)(ulong)sspi->base_addr;
 	unsigned int sample_delay;
-	unsigned int start_backup = 0, end_backup = 0;
-	unsigned int mode, startry_mode = 0, endtry_mode = 6, block = 0;
-	unsigned int half_cycle_ps, sample_delay_ps = 155;
-	unsigned int min_delay = 0, max_delay = 0, right_sample_delay;
+	unsigned int start_ok = 0, end_ok = 0, len_ok = 0, mode_ok = 0;
+	unsigned int start_backup = 0, end_backup = 0, len_backup = 0;
+	unsigned int mode = 0, startry_mode = 0, endtry_mode = 6, block = 0;
 	u8 erase_opcode = nor->erase_opcode;
 	uint32_t erasesize = mtd->erasesize;
-	nor->erase_opcode = SPINOR_OP_BE_4K;
-	mtd->erasesize = 4096;
+	if (mtd->size > SZ_16M)
+		nor->erase_opcode = SPINOR_OP_BE_32K_4B;
+	else
+		nor->erase_opcode = SPINOR_OP_BE_32K;
+	mtd->erasesize = 32 * 1024;
 
 	size_t retlen;
 	u_char *cache_source;
 	u_char *cache_target;
 	u_char *cache_boot0;
-	int len = mtd->writesize;
+	int len = nor->page_size;
 
 	struct erase_info instr;
 	instr.addr = block * mtd->erasesize;
 	instr.len = (endtry_mode - startry_mode + 1) * mtd->erasesize;
 
 	//sspi->msglevel &= ~sspi_MSG_EN;
-	cache_boot0 = calloc(1, instr.len);
+	cache_boot0 = malloc_align(instr.len, 64);
 	mtd->_read(mtd, instr.addr, instr.len, &retlen, cache_boot0);
 	mtd->_erase(mtd, &instr);
 
 	/* re-initialize from device tree */
 	spi_init_clk(slave);
-	/* How much (ps) is required for half a cycle */
-	half_cycle_ps = 1 * 1000 * 1000  / (sspi->max_hz / 1000 / 1000) / 2;
 
-	cache_source = calloc(1, len);
-	cache_target = calloc(1, len);
+	cache_source = malloc_align(len, 64);
+	cache_target = malloc_align(len, 64);
 	memset(cache_source, 0xa5, len);
 
 	spi_samp_mode(base_addr, 1);
@@ -1250,7 +1254,7 @@ void sunxi_update_right_delay_para(struct mtd_info *mtd)
 		for (sample_delay = 0; sample_delay < 64; sample_delay++) {
 			spi_set_sample_delay(base_addr, sample_delay);
 			mtd->_write(mtd, block * mtd->erasesize +
-					sample_delay * mtd->writesize,
+					sample_delay * nor->page_size,
 					len, &retlen, cache_source);
 		}
 
@@ -1258,76 +1262,68 @@ void sunxi_update_right_delay_para(struct mtd_info *mtd)
 			spi_set_sample_delay(base_addr, sample_delay);
 			memset(cache_target, 0, len);
 			mtd->_read(mtd, block * mtd->erasesize +
-					sample_delay * mtd->writesize,
+					sample_delay * nor->page_size,
 					len, &retlen, cache_target);
 
 			if (strncmp((char *)cache_source, (char *)cache_target,
 						len) == 0) {
-				pr_debug("mode:%d delat:%d time:%dps[OK]\n",
-						mode, sample_delay,
-						mode * half_cycle_ps +
-						sample_delay * sample_delay_ps);
-				if (!start_backup) {
-					start_backup = mode * half_cycle_ps +
-						sample_delay * sample_delay_ps;
-					end_backup = mode * half_cycle_ps +
-						sample_delay * sample_delay_ps;
-				} else {
-					end_backup = mode * half_cycle_ps +
-						sample_delay * sample_delay_ps;
-				}
+				pr_debug("mode:%d delat:%d [OK]\n",
+						mode, sample_delay);
+				if (!len_backup) {
+					start_backup = sample_delay;
+					end_backup = sample_delay;
+				} else
+					end_backup = sample_delay;
+				len_backup++;
 			} else {
-				pr_debug("mode:%d delay:%d time:%dps [ERROR]\n",
-						mode, sample_delay,
-						mode * half_cycle_ps +
-						sample_delay * sample_delay_ps);
+				pr_debug("mode:%d delay:%d [ERROR]\n",
+						mode, sample_delay);
 				if (!start_backup)
 					continue;
 				else {
-					if (!min_delay)
-						min_delay = start_backup;
-					else if (start_backup < min_delay)
-						min_delay = start_backup;
-					if (end_backup > max_delay)
-						max_delay = end_backup;
+					if (len_backup > len_ok) {
+						len_ok = len_backup;
+						start_ok = start_backup;
+						end_ok = end_backup;
+						mode_ok = mode;
+					}
 
+					len_backup = 0;
 					start_backup = 0;
 					end_backup = 0;
 				}
 			}
 		}
 
-		if ((start_backup < min_delay || !min_delay) && start_backup)
-			min_delay = start_backup;
-		if (end_backup > max_delay)
-			max_delay = end_backup;
-
+		if (len_backup > len_ok) {
+			len_ok = len_backup;
+			start_ok = start_backup;
+			end_ok = end_backup;
+			mode_ok = mode;
+		}
+		len_backup = 0;
 		start_backup = 0;
 		end_backup = 0;
 
 		block++;
 	}
 
-	right_sample_delay = (min_delay + max_delay) / 2;
-	if (!right_sample_delay) {
+	if (!len_ok) {
 		spi_samp_mode(base_addr, 0);
 		spi_samp_dl_sw_status(base_addr, 0);
 		if ((sspi->max_hz / 1000 / 1000) >= 60)
-			sspi->right_sample_mode = DELAY_1_CYCLE_SAMPLE;
+			sspi->right_sample_mode = 2;
 		else if ((sspi->max_hz / 1000 / 1000) <= 24)
-			sspi->right_sample_mode = DELAY_NORMAL_SAMPLE;
+			sspi->right_sample_mode = 0;
 		else
-			sspi->right_sample_mode = DELAY_0_5_CYCLE_SAMPLE;
+			sspi->right_sample_mode = 1;
 	} else {
-		sspi->right_sample_delay =
-			(right_sample_delay % half_cycle_ps) / sample_delay_ps;
-		sspi->right_sample_mode =
-			right_sample_delay / half_cycle_ps;
+		sspi->right_sample_delay = (start_ok + end_ok) / 2;
+		sspi->right_sample_mode = mode_ok;
 		spi_set_sample_delay(base_addr, sspi->right_sample_delay);
 	}
-	pr_info("Sample mode:%d  min_delay:%d max_delay:%d right_delay:%d)\n",
-			sspi->right_sample_mode,
-			min_delay, max_delay,
+	pr_info("Sample mode:%d start:%d end:%d right_sample_delay:0x%x\n",
+			mode_ok, start_ok, end_ok,
 			sspi->right_sample_delay);
 	spi_set_sample_mode(base_addr, sspi->right_sample_mode);
 
@@ -1336,51 +1332,154 @@ void sunxi_update_right_delay_para(struct mtd_info *mtd)
 	//sspi->msglevel |= sspi_MSG_EN;
 	nor->erase_opcode = erase_opcode;
 	mtd->erasesize = erasesize;
-	free(cache_source);
-	free(cache_target);
-	free(cache_boot0);
+	free_align(cache_source);
+	free_align(cache_target);
+	free_align(cache_boot0);
 	return ;
 }
 
+#ifdef CONFIG_SPI_SAMP_DL_EN
+void boot_try_delay_param(struct mtd_info *mtd, boot_spinor_info_t *boot_info)
+{
+	struct spi_nor *nor = mtd->priv;
+	struct spi_slave *slave = nor->spi;
+	struct sunxi_spi_slave *sspi = to_sunxi_slave(slave);
+	void __iomem *base_addr = (void *)(ulong)sspi->base_addr;
+	unsigned int sample_delay;
+	unsigned int start_ok = 0, end_ok = 0, len_ok = 0, mode_ok = 0;
+	unsigned int start_backup = 0, end_backup = 0, len_backup = 0;
+	unsigned int mode = 0, startry_mode = 0, endtry_mode = 6;
+	size_t retlen, len = 512;
+	boot0_file_head_t *boot0_head;
+	boot0_head = malloc_align(len, 64);
+
+	/* re-initialize from device tree */
+	spi_init_clk(slave);
+
+	spi_samp_mode(base_addr, 1);
+	spi_samp_dl_sw_status(base_addr, 1);
+	for (mode = startry_mode; mode <= endtry_mode; mode++) {
+		spi_set_sample_mode(base_addr, mode);
+		for (sample_delay = 0; sample_delay < 64; sample_delay++) {
+			spi_set_sample_delay(base_addr, sample_delay);
+			memset(boot0_head, 0, len);
+			mtd->_read(mtd, 0, len, &retlen, (u_char *)boot0_head);
+
+			if (strncmp((char *)boot0_head->boot_head.magic,
+				(char *)BOOT0_MAGIC,
+				sizeof(boot0_head->boot_head.magic)) == 0) {
+				pr_debug("mode:%d delat:%d [OK]\n",
+						mode, sample_delay);
+				if (!len_backup) {
+					start_backup = sample_delay;
+					end_backup = sample_delay;
+				} else
+					end_backup = sample_delay;
+				len_backup++;
+			} else {
+				pr_debug("mode:%d delay:%d [ERROR]\n",
+						mode, sample_delay);
+				if (!start_backup)
+					continue;
+				else {
+					if (len_backup > len_ok) {
+						len_ok = len_backup;
+						start_ok = start_backup;
+						end_ok = end_backup;
+						mode_ok = mode;
+					}
+
+					len_backup = 0;
+					start_backup = 0;
+					end_backup = 0;
+				}
+			}
+		}
+		if (len_backup > len_ok) {
+			len_ok = len_backup;
+			start_ok = start_backup;
+			end_ok = end_backup;
+			mode_ok = mode;
+		}
+		len_backup = 0;
+		start_backup = 0;
+		end_backup = 0;
+	}
+
+	if (!len_ok) {
+		spi_samp_mode(base_addr, 0);
+		spi_samp_dl_sw_status(base_addr, 0);
+		if ((sspi->max_hz / 1000 / 1000) >= 60)
+			sspi->right_sample_mode = 2;
+		else if ((sspi->max_hz / 1000 / 1000) <= 24)
+			sspi->right_sample_mode = 0;
+		else
+			sspi->right_sample_mode = 1;
+	} else {
+		sspi->right_sample_delay = (start_ok + end_ok) / 2;
+		sspi->right_sample_mode = mode_ok;
+		spi_set_sample_delay(base_addr, sspi->right_sample_delay);
+	}
+	pr_info("Sample mode:%d start:%d end:%d right_sample_delay:0x%x\n",
+			mode_ok, start_ok, end_ok,
+			sspi->right_sample_delay);
+	spi_set_sample_mode(base_addr, sspi->right_sample_mode);
+
+	boot_info->sample_delay = sspi->right_sample_delay;
+	boot_info->sample_mode = sspi->right_sample_mode;
+	free_align(boot0_head);
+	return;
+}
+
+extern int update_boot_param(struct spi_nor *flash);
 int sunxi_set_right_delay_para(struct mtd_info *mtd)
 {
 	struct spi_nor *nor = mtd->priv;
 	struct spi_slave *slave = nor->spi;
 	struct sunxi_spi_slave *sspi = to_sunxi_slave(slave);
 	void __iomem *base_addr = (void *)(ulong)sspi->base_addr;
-	boot0_file_head_t *boot0;
-	boot_spinor_info_t *boot_info;
+	boot_spinor_info_t *boot_info = NULL;
 	size_t retlen;
-	boot0 = calloc(1, 2048);
 
-	mtd->_read(mtd, 0, 2048, &retlen, (u_char *)boot0);
+	struct sunxi_boot_param_region *boot_param = NULL;
+	boot_param = malloc_align(BOOT_PARAM_SIZE, 64);
 
-	if(gd->bootfile_mode  == SUNXI_BOOT_FILE_NORMAL
-		 || gd->bootfile_mode  == SUNXI_BOOT_FILE_PKG) {
-		boot_info = (boot_spinor_info_t *)boot0->prvt_head.storage_data;
-	} else {
-		sbrom_toc0_config_t *toc0_config = NULL;
+	mtd->_read(mtd, (CONFIG_SPINOR_UBOOT_OFFSET << 9) - BOOT_PARAM_SIZE,
+			BOOT_PARAM_SIZE, &retlen, (u_char *)boot_param);
+	boot_info = (boot_spinor_info_t *)boot_param->spiflash_info;
 
-		toc0_config = (sbrom_toc0_config_t *)(boot0 + 0x80);
-		boot_info = (boot_spinor_info_t *)toc0_config->storage_data;
+	if (strncmp((const char *)boot_param->header.magic,
+				(const char *)BOOT_PARAM_MAGIC,
+				sizeof(boot_param->header.magic)) ||
+		strncmp((const char *)boot_info->magic,
+				(const char *)SPINOR_BOOT_PARAM_MAGIC,
+				sizeof(boot_info->magic))) {
+		boot_try_delay_param(mtd, boot_info);
+		if (update_boot_param(nor))
+			printf("update boot param error\n");
 	}
 
-	pr_force("spi sample_mode:%d sample_delay:%d\n",
+	if (boot_info->sample_delay == SAMP_MODE_DL_DEFAULT) {
+		boot_try_delay_param(mtd, boot_info);
+		if (update_boot_param(nor))
+			printf("update boot param error\n");
+	}
+
+	pr_force("spi sample_mode:%x sample_delay:%x\n",
 			boot_info->sample_mode, boot_info->sample_delay);
-	spi_set_sample_mode(base_addr, boot_info->sample_mode);
 
-	if (boot_info->sample_delay != SAMP_MODE_DL_DEFAULT) {
-		spi_samp_mode(base_addr, 1);
-		spi_samp_dl_sw_status(base_addr, 1);
-		spi_set_sample_delay(base_addr, boot_info->sample_delay);
-		sspi->right_sample_delay = boot_info->sample_delay;
-		sspi->right_sample_mode = boot_info->sample_mode;
-	}
+	spi_samp_mode(base_addr, 1);
+	spi_samp_dl_sw_status(base_addr, 1);
+	spi_set_sample_mode(base_addr, boot_info->sample_mode);
+	spi_set_sample_delay(base_addr, boot_info->sample_delay);
+	sspi->right_sample_delay = boot_info->sample_delay;
+	sspi->right_sample_mode = boot_info->sample_mode;
 
 	spi_init_clk(slave);
-	free(boot0);
+	free_align(boot_param);
 	return 0;
 }
+#endif
 
 int spi_xfer(struct spi_slave *slave, unsigned int bitlen,
 		const void *dout, void *din, unsigned long flags)

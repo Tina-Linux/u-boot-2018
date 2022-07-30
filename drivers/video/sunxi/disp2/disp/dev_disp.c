@@ -992,17 +992,6 @@ long disp_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 	//----layer----
 	case DISP_LAYER_SET_CONFIG:
 	{
-
-		const unsigned int lyr_cfg_size = ARRAY_SIZE(lyr_cfg);
-
-		if (IS_ERR_OR_NULL((void __user *)ubuffer[1])) {
-			__wrn("incoming pointer of user is ERR or NULL");
-			return -EFAULT;
-		}
-		if (ubuffer[2] == 0 || ubuffer[2] > lyr_cfg_size) {
-			__wrn("layer number need to be set from 1 to %d\n", lyr_cfg_size);
-			return -EFAULT;
-		}
 		if (copy_from_user(lyr_cfg,
 			(void __user *)ubuffer[1],
 			sizeof(struct disp_layer_config) * ubuffer[2]))	{
@@ -1016,17 +1005,6 @@ long disp_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 
 	case DISP_LAYER_GET_CONFIG:
 	{
-
-		const unsigned int lyr_cfg_size = ARRAY_SIZE(lyr_cfg);
-
-		if (IS_ERR_OR_NULL((void __user *)ubuffer[1])) {
-			__wrn("incoming pointer of user is ERR or NULL");
-			return -EFAULT;
-		}
-		if (ubuffer[2] == 0 || ubuffer[2] > lyr_cfg_size) {
-			__wrn("layer number need to be set from 1 to %d\n", lyr_cfg_size);
-			return -EFAULT;
-		}
 		if (copy_from_user(lyr_cfg,
 			(void __user *)ubuffer[1],
 			sizeof(struct disp_layer_config) * ubuffer[2]))	{
@@ -1048,17 +1026,6 @@ long disp_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 
 	case DISP_LAYER_SET_CONFIG2:
 	{
-
-		const unsigned int lyr_cfg_size = ARRAY_SIZE(lyr_cfg2);
-
-		if (IS_ERR_OR_NULL((void __user *)ubuffer[1])) {
-			__wrn("incoming pointer of user is ERR or NULL");
-			return -EFAULT;
-		}
-		if (ubuffer[2] == 0 || ubuffer[2] > lyr_cfg_size) {
-			__wrn("layer number need to be set from 1 to %d\n", lyr_cfg_size);
-			return -EFAULT;
-		}
 		if (copy_from_user(lyr_cfg2,
 		    (void __user *)ubuffer[1],
 		    sizeof(struct disp_layer_config2) * ubuffer[2])) {
@@ -1073,17 +1040,6 @@ long disp_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 
 	case DISP_LAYER_GET_CONFIG2:
 	{
-
-		const unsigned int lyr_cfg_size = ARRAY_SIZE(lyr_cfg2);
-
-		if (IS_ERR_OR_NULL((void __user *)ubuffer[1])) {
-			__wrn("incoming pointer of user is ERR or NULL");
-			return -EFAULT;
-		}
-		if (ubuffer[2] == 0 || ubuffer[2] > lyr_cfg_size) {
-			__wrn("layer number need to be set from 1 to %d\n", lyr_cfg_size);
-			return -EFAULT;
-		}
 		if (copy_from_user(lyr_cfg2,
 		    (void __user *)ubuffer[1],
 		    sizeof(struct disp_layer_config2) * ubuffer[2])) {

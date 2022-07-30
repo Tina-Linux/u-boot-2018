@@ -315,7 +315,6 @@ static inline void regwrite(void *dst, void *src, unsigned int n)
 #define CLK_NUM_PER_DSI 1
 #define DEVICE_DSI_NUM 1
 #define HAVE_DEVICE_COMMON_MODULE
-#define SUNXI_DSI_PASSIVE_BUG
 
 #elif defined(CONFIG_MACH_SUN8IW19)
 #define DEVICE_NUM	1

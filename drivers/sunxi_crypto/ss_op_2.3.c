@@ -9,8 +9,23 @@
 #include <asm/io.h>
 #include <asm/arch/clock.h>
 #include <asm/arch/ce.h>
+#include <asm/arch/efuse.h>
 
 static int ss_base_mode;
+
+__weak void ss_get_soc_status(void)
+{
+#ifdef CONFIG_SUNXI_SECURE_CRYPTO
+	if (sid_get_security_status()) {
+		ss_base_mode = 0;
+	} else {
+		ss_base_mode = 1;
+	}
+#else
+	ss_base_mode = 0;
+#endif
+}
+
 
 __weak int ss_get_ver(void)
 {
@@ -95,6 +110,8 @@ __weak void ss_open(void)
 		(struct sunxi_ccm_reg *)SUNXI_CCM_BASE;
 	u32 reg_val;
 	static int initd;
+
+	ss_get_soc_status();
 
 	if (initd)
 		return;

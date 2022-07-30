@@ -376,6 +376,17 @@
 			status = "okay";
 		};
 
+		hdmi: hdmi@5500000 {
+			compatible = "allwinner,sunxi-hdmi";
+			reg = <0x0 0x05500000 0x0 0xfffff>;
+			interrupts = <GIC_SPI 93 IRQ_TYPE_LEVEL_HIGH>;
+			interrupt-parent = <&gic>;
+			clocks = <&clk_hdmi_slow>,
+				<&clk_hdmi_cec>,
+				<&clk_tcon_tv>;
+			status = "okay";
+		};
+
 		eink: eink@6400000 {
 			compatible = "allwinner,sunxi-eink";
 			pinctrl-names = "active","sleep";

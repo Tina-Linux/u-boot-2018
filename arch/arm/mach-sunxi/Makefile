@@ -39,3 +39,5 @@ obj-$(CONFIG_MACH_SUN8IW11) += clock_sun8iw11.o
 obj-$(CONFIG_MACH_SUN20IW1) += clock_sun20iw1.o
 obj-$(CONFIG_MACH_SUN8IW20) += clock_sun8iw20.o
 obj-$(CONFIG_MACH_SUN8IW21) += clock_sun8iw21.o
+
+subdir-ccflags-$(CONFIG_SUNXI_TRACE) += -finstrument-functions

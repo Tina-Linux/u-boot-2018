@@ -172,8 +172,7 @@ int show_bmp_on_fb(char *bmp_head_addr, unsigned int fb_id)
 		printf("this is not a bmp picture\n");
 		goto err_out;
 	}
-	if ((bmp->header.bit_count != 16) && (bmp->header.bit_count != 24)
-			&& (bmp->header.bit_count != 32)) {
+	if ((bmp->header.bit_count != 24) && (bmp->header.bit_count != 32)) {
 		printf("no support %d bit bmp\n", bmp->header.bit_count);
 		goto err_out;
 	}
@@ -235,24 +234,6 @@ int show_bmp_on_fb(char *bmp_head_addr, unsigned int fb_id)
 					       ((*(c_b + 2)) << 16) |
 					       ((*(c_b + 1)) << 8) | (*c_b);
 					c_b += 3;
-				}
-				src_addr += src_stride;
-			}
-		} else if ((bmp->header.bit_count == 16) && (cv->bpp == 32)) {
-			uint16_t rgb565;
-			for (; dst_addr_b != dst_addr_e;
-			     dst_addr_b += cv->stride) {
-				int *d = (int *)dst_addr_b;
-				char *c_b = src_addr;
-				char *c_end = c_b + src_cp_bytes;
-
-				for (; c_b < c_end;) {
-					rgb565 = *(c_b + 1) << 8 | *c_b;
-					*d++ = 0xFF000000 |
-					       (((rgb565 & 0xf800) >> 8) << 16) |
-					       (((rgb565 & 0x07e0) >> 3) << 8) |
-					       ((rgb565 & 0x001f) << 3);
-					c_b += 2;
 				}
 				src_addr += src_stride;
 			}

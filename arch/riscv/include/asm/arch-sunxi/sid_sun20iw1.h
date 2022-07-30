@@ -23,6 +23,11 @@
 
 #define EFUSE_CHIPID            (0x0)
 
+#define EFUSE_ANTI_BRUSH		(0x10)
+
+#define ANTI_BRUSH_BIT_OFFSET			(31)
+#define ANTI_BRUSH_MODE			(SID_EFUSE + EFUSE_ANTI_BRUSH)
+
 /* write protect */
 #define EFUSE_WRITE_PROTECT		(0x40)
 /* read  protect */
@@ -30,9 +35,10 @@
 /* jtag security */
 
 #define EFUSE_ROTPK					(0x70)
+#define EFUSE_OEM_PROGRAM			(0x38)
+#define SID_OEM_PROGRAM_SIZE		(64)
 
-#define SCC_ROTPK_DONTSHOW_FLAG					(12)
-
+/*write protect*/
 #define SCC_ROTPK_BURNED_FLAG					(12)
 
 /*efuse power ctl*/

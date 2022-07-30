@@ -135,3 +135,5 @@ obj-$(CONFIG_$(SPL_)LOG) += log.o
 obj-$(CONFIG_$(SPL_)LOG_CONSOLE) += log_console.o
 obj-y += s_record.o
 obj-y += xyzModem.o
+
+subdir-ccflags-$(CONFIG_SUNXI_TRACE) += -finstrument-functions

@@ -673,6 +673,27 @@ clocks {
 			assigned-clocks = <&clk_tcon_tv>;
 			assigned-clock-parents = <&clk_pll_video1x4>;
 		};
+		clk_hdmi: hdmi {
+			#clock-cells = <0>;
+			compatible = "allwinner,periph-clock";
+			assigned-clock-parents = <&clk_pll_video0>;
+			assigned-clocks = <&clk_hdmi>;
+			clock-output-names = "hdmi";
+		};
+		clk_hdmi_slow: hdmi_slow {
+			#clock-cells = <0>;
+			compatible = "allwinner,periph-clock";
+			assigned-clock-parents = <&clk_hosc>;
+			assigned-clocks = <&clk_hdmi_slow>;
+			clock-output-names = "hdmi_slow";
+		};
+		clk_hdmi_cec: hdmi_cec {
+			#clock-cells = <0>;
+			compatible = "allwinner,periph-clock";
+			assigned-clock-parents = <&clk_periph32k>;
+			assigned-clocks = <&clk_hdmi_cec>;
+			clock-output-names = "hdmi_cec";
+		};
 
 		clk_lvds: lvds {
 			#clock-cells = <0>;

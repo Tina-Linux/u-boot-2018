@@ -18,6 +18,7 @@
 #include  "../sprite_cartoon.h"
 #include  "../sprite_cartoon_color.h"
 #include  "sprite_progressbar_i.h"
+#include <sunxi_eink.h>
 
 progressbar_t   progress;
 /*
@@ -220,6 +221,9 @@ int sprite_cartoon_progressbar_upgrate(progressbar_t *p, int rate)
 	int pixel;
 	int x1 = 0, y1 = 0;
 	int x2 = 0, y2 = 0;
+#if defined(CONFIG_EINK200_SUNXI)
+	struct eink_fb_info_t *p_eink_fb = eink_get_fb_inst();
+#endif
 
 	if ((rate < 0) || (rate > 100)) {
 		printf("sprite_cartoon ui progressbar: invalid progressbar "
@@ -277,6 +281,11 @@ int sprite_cartoon_progressbar_upgrate(progressbar_t *p, int rate)
 	sprite_cartoon_ui_draw_solidrectangle(x1, y1, x2, y2);
 
 	sprite_cartoon_ui_set_color(base_color);
+#if defined(CONFIG_EINK200_SUNXI)
+	if (p_eink_fb) {
+		p_eink_fb->eink_display(p_eink_fb);
+	}
+#endif
 
 	return 0;
 }

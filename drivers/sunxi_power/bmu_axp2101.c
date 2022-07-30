@@ -24,7 +24,7 @@ static int bmu_axp2101_probe(void)
 		return -1;
 	}
 	bmu_chip_id &= 0XCF;
-	if (bmu_chip_id == 0x47) {
+	if (bmu_chip_id == 0x47 || bmu_chip_id == 0x4a) {
 		/*bmu type AXP21*/
 		tick_printf("BMU: AXP21\n");
 		return 0;

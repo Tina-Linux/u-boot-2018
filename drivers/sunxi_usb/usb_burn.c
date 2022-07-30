@@ -1422,6 +1422,11 @@ static int sunxi_pburn_state_loop(void  *buffer)
 					}
 					break;
 				case 0xf0:			//burn user data
+					if (sunxi_auto_fel_runnning) {
+						//dont process dragonSN commands
+						//when we are performing auto_fel
+						break;
+					}
 	  				sunxi_usb_dbg("usb burn secure storage data\n");
 	  				printf("usb command = %d\n", cbw->CBWCDB[1]);
 	  				switch(cbw->CBWCDB[1])
@@ -1655,6 +1660,11 @@ static int sunxi_pburn_state_loop(void  *buffer)
 	  			break;
 
 				case 0xf3: //自定义命令，用于烧录用户数据
+					if (sunxi_auto_fel_runnning) {
+						//dont process dragonSN commands
+						//when we are performing auto_fel
+						break;
+					}
 					sunxi_usb_burn_private_partition(cbw, &csw);
 				break;
 			}

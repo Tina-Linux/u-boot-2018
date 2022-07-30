@@ -2380,26 +2380,23 @@ static disp_lcd_flow * disp_lcd_get_open_flow(struct disp_device* lcd)
 	}
 	if (lcdp->need_open_again) {
 		lcdp->need_open_again = false;
-		lcdp->open_flow.func_num = 0;
 		return NULL;/*NULL for caller to call openflow again*/
 	}
+	lcdp->open_flow.func_num = 0;
+	if (!disp_lcd_is_used(lcd))
+		goto exit;
+	lcdp->open_flow.func[lcdp->open_flow.func_num].func = disp_lcd_pre_enable_ex;
+	lcdp->open_flow.func[lcdp->open_flow.func_num].delay = 0;
+	lcdp->open_flow.func_num ++;
 
-	if (lcdp->open_flow.func_num == 0) {
-		if (!disp_lcd_is_used(lcd))
-			goto exit;
-		lcdp->open_flow.func[lcdp->open_flow.func_num].func = disp_lcd_pre_enable_ex;
-		lcdp->open_flow.func[lcdp->open_flow.func_num].delay = 0;
-		lcdp->open_flow.func_num++;
-
-		if (lcdp->lcd_panel_fun.cfg_open_flow) {
-			lcdp->lcd_panel_fun.cfg_open_flow(lcd->disp);
-		}	else {
-			DE_WRN("lcd_panel_fun[%d].cfg_open_flow is NULL\n", lcd->disp);
-		}
-		lcdp->open_flow.func[lcdp->open_flow.func_num].func = disp_lcd_post_enable_ex;
-		lcdp->open_flow.func[lcdp->open_flow.func_num].delay = 0;
-		lcdp->open_flow.func_num++;
+	if(lcdp->lcd_panel_fun.cfg_open_flow)	{
+		lcdp->lcd_panel_fun.cfg_open_flow(lcd->disp);
+	}	else {
+		DE_WRN("lcd_panel_fun[%d].cfg_open_flow is NULL\n", lcd->disp);
 	}
+	lcdp->open_flow.func[lcdp->open_flow.func_num].func = disp_lcd_post_enable_ex;
+	lcdp->open_flow.func[lcdp->open_flow.func_num].delay = 0;
+	lcdp->open_flow.func_num ++;
 
 exit:
 	return &(lcdp->open_flow);

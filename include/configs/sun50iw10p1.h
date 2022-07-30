@@ -61,6 +61,10 @@
 
 #define CONFIG_SYS_BOOTM_LEN 0x2400000
 
+#ifdef CONFIG_SUNXI_MALLOC_LEN
+#define SUNXI_SYS_MALLOC_LEN   CONFIG_SUNXI_MALLOC_LEN
+#endif
+
 #define PHOENIX_PRIV_DATA_ADDR      (SUNXI_SYS_SRAM_BASE + 0x42200)                      //给phoenix保留的空间
 
 /*

@@ -222,10 +222,7 @@ static int creat_framebuffer(framebuffer_t *fb, const fb_config_t *const fb_cfg)
 
 	fb->cv->width = fb_cfg->width;
 	fb->cv->height = fb_cfg->height;
-	if (16 == fb_cfg->bpp) {
-		fb->cv->bpp = 16;
-		fb->cv->pixel_format_name = "RGB565";
-	} else if (32 == fb_cfg->bpp) {
+	if (32 == fb_cfg->bpp) {
 		fb->cv->bpp = 32;
 		fb->cv->pixel_format_name = "ARGB8888";
 	} else if (24 == fb_cfg->bpp) {

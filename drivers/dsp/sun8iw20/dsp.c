@@ -78,6 +78,9 @@ static int load_image(u32 img_addr, u32 dsp_id)
 	void *src = NULL;
 	int i = 0;
 	int size = sizeof(addr_mapping) / sizeof(struct vaddr_range_t);
+	ulong mem_start = 0;
+	u32 mem_size = 0;
+
 	ehdr = (Elf32_Ehdr *)(ADDR_TPYE)img_addr;
 	phdr = (Elf32_Phdr *)(ADDR_TPYE)(img_addr + ehdr->e_phoff);
 
@@ -101,11 +104,18 @@ static int load_image(u32 img_addr, u32 dsp_id)
 		if (i == 0)
 			show_img_version((char *)dst + 896, dsp_id);
 
-		flush_cache(ROUND_DOWN_CACHE((unsigned long)dst),
-			    ROUND_UP_CACHE(phdr->p_filesz));
+		//flush_cache(ROUND_DOWN_CACHE((unsigned long)dst),
+		//	    ROUND_UP_CACHE(phdr->p_filesz));
 		++phdr;
 	}
 
+	dts_get_dsp_memory(&mem_start, &mem_size, dsp_id);
+	if (!mem_start || !mem_size) {
+		pr_err("dts_get_dsp_memory fail\n");
+	} else {
+		flush_cache(ROUND_DOWN_CACHE(mem_start),
+		ROUND_UP_CACHE(mem_size));
+	}
 	return 0;
 }
 

@@ -808,7 +808,8 @@ static int aw_host_nfc_batch_op(struct aw_nand_chip *chip, struct aw_nfc_batch_r
 		aw_host_nfc_ecc_enable(nfc, 1);
 		if (chip->random) {
 			aw_host_nfc_randomize_enable(nfc, page_in_block);
-		}
+		} else
+			aw_host_nfc_randomize_disable(nfc);
 	} else {
 		aw_host_nfc_set_ecc_mode(nfc, chip->boot0_ecc_mode);
 		aw_host_nfc_ecc_enable(nfc, 1);

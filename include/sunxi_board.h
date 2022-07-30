@@ -75,7 +75,6 @@ extern int board_display_device_open(void);
 extern int board_display_eink_update(char *name, __u32 update_mode);
 /* extern int board_display_eink_panel_release(void); */
 extern int eink_driver_init(void);
-extern int sunxi_eink_fresh_image(char *name, __u32 update_mode);
 extern int tps65185_modules_init(void);
 extern int tps65185_init(void);
 extern int borad_display_get_screen_width(void);
@@ -96,7 +95,7 @@ extern void usb_detect_for_charge(int detect_time);
 extern int sunxi_flash_handle_init(void);
 
 extern int sunxi_bmp_display(char *name);
-extern int sunxi_Eink_Get_bmp_buffer(char *name, char *bmp_gray_buf);
+extern int sunxi_jpeg_display(const char *filename);
 
 extern int drv_disp_init(void);
 extern int drv_disp_exit(void);

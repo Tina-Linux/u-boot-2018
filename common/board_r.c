@@ -75,6 +75,8 @@ ulong monitor_flash_len;
 extern int sunxi_burn_rotpk(void);
 #endif
 
+static int initr_env(void);
+
 __weak int board_flash_wp_on(void)
 {
 	/*
@@ -535,6 +537,13 @@ static int initr_sunxi_plat(void)
 	pwm_led_init();
 #endif
 
+#ifdef CONFIG_SUNXI_ANTI_COPY_BOARD
+	int sunxi_anti_copy_board(void);
+	ret = sunxi_anti_copy_board();
+	if (ret)
+		return ret;
+#endif
+
 #ifdef CONFIG_BOOT_GUI
 	sunxi_early_logo_display();
 #endif
@@ -560,15 +569,11 @@ static int initr_sunxi_plat(void)
 		int sunxi_update_gpt(void);
 		sunxi_update_gpt();
 #endif
-#ifdef CONFIG_BOOT_GUI
-		void board_bootlogo_display(void);
-		board_bootlogo_display();
-#else
-#ifdef CONFIG_SUNXI_SPINOR_JPEG
-		int sunxi_jpeg_display(const char *filename);
-		sunxi_jpeg_display("bootlogo");
+
+#ifdef CONFIG_ENABLE_MTD_CMDLINE_PARTS_BY_ENV
+	initr_env();
 #endif
-#endif
+
 		sunxi_probe_partition_map();
 	}
 
@@ -1008,7 +1013,9 @@ static init_fnc_t init_sequence_r[] = {
 #ifdef CONFIG_ARCH_SUNXI
 	initr_sunxi_plat,
 #endif
+#ifndef CONFIG_ENABLE_MTD_CMDLINE_PARTS_BY_ENV
 	initr_env,
+#endif
 	board_env_late_init,
 #if defined(CONFIG_MICROBLAZE) || defined(CONFIG_M68K)
 	timer_init,		/* initialize timer */

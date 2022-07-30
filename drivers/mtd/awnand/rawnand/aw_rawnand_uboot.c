@@ -16,7 +16,7 @@
 #include <linux/mtd/aw-ubi.h>
 
 
-#define VERSION "v1.25 2021-11-15 21:27"
+#define VERSION "v1.28 2021-12-13 16:13"
 
 void DISPLAY_VERSION(void)
 {

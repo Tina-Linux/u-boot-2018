@@ -135,6 +135,11 @@ const struct flash_info spi_nor_ids[] = {
 			SPI_NOR_DUAL_READ | SPI_NOR_QUAD_READ |
 			SPI_NOR_4B_OPCODES)
 	},
+	{
+		INFO("gd25b512me", 0xc8471a, 0x0, 128 * 1024, 512,
+			SPI_NOR_DUAL_READ | SPI_NOR_QUAD_READ |
+			SPI_NOR_4B_OPCODES)
+	},
 #endif
 #ifdef CONFIG_SPI_FLASH_ISSI		/* ISSI */
 	/* ISSI */
@@ -348,6 +353,8 @@ const struct flash_info spi_nor_ids[] = {
 
 	/*Zetta*/
 	{ INFO("zd25q64b", 0xba3217, 0, 64 * 1024, 128, SECT_4K | SPI_NOR_DUAL_READ | SPI_NOR_QUAD_READ) },
+	{ INFO("zb25vq64as", 0x5e4017, 0, 64 * 1024, 128, SPI_NOR_DUAL_READ | SPI_NOR_QUAD_READ) },
+	{ INFO("zb25vq128as", 0x5e4018, 0, 64 * 1024, 256, SPI_NOR_DUAL_READ | SPI_NOR_QUAD_READ) },
 
 	{ },
 };

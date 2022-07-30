@@ -786,7 +786,7 @@ libs-y += $(if $(BOARDDIR),board/$(BOARDDIR)/)
 
 libs-y := $(sort $(libs-y))
 
-u-boot-dirs	:= $(patsubst %/,%,$(filter %/, $(libs-y))) tools examples
+u-boot-dirs	:= $(patsubst %/,%,$(filter %/, $(libs-y))) tools #examples
 
 u-boot-alldirs	:= $(sort $(u-boot-dirs) $(patsubst %/,%,$(filter %/, $(libs-))))
 
@@ -805,6 +805,12 @@ endif
 PLATFORM_LIBS += $(PLATFORM_LIBGCC)
 ifeq ($(CONFIG_SUNXI_NAND),y)
 ifneq ($(findstring $(CONFIG_SYS_CONFIG_NAME),"sun8iw18p1" "sun50iw3p1" "sun8iw7p1"),)
+PLATFORM_LIBS += drivers/sunxi_flash/nand/$(CONFIG_SYS_CONFIG_NAME)/libnand-$(CONFIG_SYS_CONFIG_NAME)
+endif
+endif
+
+ifeq ($(CONFIG_SUNXI_NAND)_$(CONFIG_SUNXI_RTOS),y_y)
+ifneq ($(findstring $(CONFIG_SYS_CONFIG_NAME),"sun8iw20p1" "sun20iw1p1"),)
 PLATFORM_LIBS += drivers/sunxi_flash/nand/$(CONFIG_SYS_CONFIG_NAME)/libnand-$(CONFIG_SYS_CONFIG_NAME)
 endif
 endif

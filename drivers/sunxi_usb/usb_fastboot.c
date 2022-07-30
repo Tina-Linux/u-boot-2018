@@ -1549,7 +1549,7 @@ static int sunxi_fastboot_init(void)
 	printf("recv addr 0x%lx\n", (ulong)trans_data.base_recv_buffer);
 	printf("send addr 0x%lx\n", (ulong)trans_data.base_send_buffer);
 	printf("start to display fastbootlogo.bmp\n");
-#if defined(CONFIG_CMD_SUNXI_BMP) || defined(CONFIG_SUNXI_TV_FASTLOGO)
+#if defined(CONFIG_CMD_SUNXI_BMP) || defined(CONFIG_SUNXI_TV_FASTLOGO) || defined(CONFIG_EINK200_SUNXI)
 	sunxi_bmp_display("fastbootlogo.bmp");
 #endif
 	char *p = NULL;

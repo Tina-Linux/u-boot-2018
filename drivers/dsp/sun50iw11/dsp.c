@@ -97,6 +97,40 @@ unsigned long set_img_va_to_pa(unsigned long vaddr,
 	return paddr;
 }
 
+static int dts_get_dsp_memory(ulong *start, u32 *size, u32 id)
+{
+	struct fdt_header *dtb_base = working_fdt;
+	int nodeoffset;
+	int ret;
+	u32 reg_data[8];
+
+	if (id == 0) {
+		nodeoffset = fdt_path_offset(dtb_base, "/reserved-memory/dsp0");
+		if (nodeoffset < 0) {
+			pr_err("%s: no /reserved-memory/dsp0 in fdt\n", __func__);
+			return -1;
+		}
+	} else {
+		nodeoffset = fdt_path_offset(dtb_base, "/reserved-memory/dsp1");
+		if (nodeoffset < 0) {
+			pr_err("%s: no /reserved-memory/dsp1 in fdt\n", __func__);
+			return -1;
+		}
+	}
+
+	memset(reg_data, 0, sizeof(reg_data));
+	ret = fdt_getprop_u32(dtb_base, nodeoffset, "reg", reg_data);
+	if (ret < 0) {
+		pr_err("%s: error fdt get reg\n", __func__);
+		return -2;
+	}
+
+	*start = reg_data[1];
+	*size = reg_data[3];
+	pr_msg("start = 0x%x size =0x%x\n", (u32)*start, *size);
+	return 0;
+}
+
 static void sunxi_dsp_set_runstall(u32 dsp_id, u32 value)
 {
 	u32 reg_val;
@@ -527,7 +561,7 @@ static int load_image_old(u32 img_addr, u32 *run_addr)
 	return 0;
 }
 
-static int load_image(u32 img_addr)
+static int load_image(u32 img_addr, u32 dsp_id)
 {
 	Elf32_Ehdr *ehdr; /* Elf header structure pointer */
 	Elf32_Phdr *phdr; /* Program header structure pointer */
@@ -535,6 +569,8 @@ static int load_image(u32 img_addr)
 	void *dst = NULL;
 	void *src = NULL;
 	int size = sizeof(addr_mapping) / sizeof(struct vaddr_range_t);
+	ulong mem_start = 0;
+	u32 mem_size = 0;
 
 	ehdr = (Elf32_Ehdr *)img_addr;
 	phdr = (Elf32_Phdr *)(img_addr + ehdr->e_phoff);
@@ -563,9 +599,17 @@ static int load_image(u32 img_addr)
 			sun50iw11_print_version(dst);
 		}
 
-		flush_cache(ROUND_DOWN_CACHE((unsigned long)dst),
-			    ROUND_UP_CACHE(phdr->p_filesz));
+		//flush_cache(ROUND_DOWN_CACHE((unsigned long)dst),
+		//	    ROUND_UP_CACHE(phdr->p_filesz));
 		++phdr;
+	}
+
+	dts_get_dsp_memory(&mem_start, &mem_size, dsp_id);
+	if (!mem_start || !mem_size) {
+		pr_err("dts_get_dsp_memory fail\n");
+	} else {
+		flush_cache(ROUND_DOWN_CACHE(mem_start),
+		ROUND_UP_CACHE(mem_size));
 	}
 
 	return 0;
@@ -826,7 +870,7 @@ int sunxi_dsp_init(u32 img_addr, u32 run_ddr, u32 dsp_id)
 		writel(reg_val, SUNXI_PRCM_BASE + PRCM_DSP_BGR_REG);
 
 		/* load image*/
-		load_image(img_addr);
+		load_image(img_addr, dsp_id);
 
 		/* set dsp vector*/
 		writel(run_ddr, DSP0_CFG_BASE + DSP_ALT_RESET_VEC_REG);
@@ -872,7 +916,7 @@ int sunxi_dsp_init(u32 img_addr, u32 run_ddr, u32 dsp_id)
 		writel(reg_val, SUNXI_PRCM_BASE + PRCM_DSP_BGR_REG);
 
 		/* load image*/
-		load_image(img_addr);
+		load_image(img_addr, dsp_id);
 
 		/* set dsp vector*/
 		writel(run_ddr, DSP1_CFG_BASE + DSP_ALT_RESET_VEC_REG);

@@ -7,8 +7,8 @@
 #include <linux/mtd/aw-spinand.h>
 
 #define AW_MTD_SPINAND_VER_MAIN		0x01
-#define AW_MTD_SPINAND_VER_SUB		0x05
-#define AW_MTD_SPINAND_VER_DATE		0x20200407
+#define AW_MTD_SPINAND_VER_SUB		0x08
+#define AW_MTD_SPINAND_VER_DATE		0x20220106
 
 
 #define spinand_to_mtd(spinand) (&spinand->mtd)

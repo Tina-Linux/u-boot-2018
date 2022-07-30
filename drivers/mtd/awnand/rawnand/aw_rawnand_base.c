@@ -1905,15 +1905,16 @@ static int aw_rawnand_chip_data_init(struct mtd_info *mtd)
 
 	chip->dies = dev->dies_per_chip;
 	for (i = 0; i < chip->dies; i++) {
-		chip->diesize[i] = dev->blks_per_die * dev->pages_per_blk * dev->pagesize;
+		chip->diesize[i] = dev->blks_per_die * dev->pages_per_blk;
+		chip->diesize[i] *= dev->pagesize;
 		chip->chipsize += chip->diesize[i];
 	}
 
 	chip->simu_chipsize = chip->chipsize;
 
-	if (chip->chipsize <= 0xffffffff)
+	if (chip->chipsize <= 0xffffffff) {
 		chip->chip_shift = ffs((unsigned)chip->chipsize) - 1;
-	else {
+	} else {
 		chip->chip_shift = ffs((unsigned)(chip->chipsize >> 32));
 		chip->chip_shift += 32 - 1;
 	}
@@ -2079,7 +2080,7 @@ static int aw_rawnand_mtd_info_init(struct mtd_info *mtd)
 	mtd->subpage_sft = 0;
 #endif
 
-	mtd->size = chip->chips << chip->chip_shift;
+	mtd->size = (uint64_t)chip->chips << chip->chip_shift;
 	mtd->bitflip_threshold = ecc_limit_tab[chip->ecc_mode];
 	mtd->name = "nand0";
 	mtd->ecc_strength = ecc_bits_tbl[chip->ecc_mode];

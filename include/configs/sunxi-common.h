@@ -20,6 +20,18 @@
 #define SUNXI_STACKSIZE_IRQ    (4*1024)        /* IRQ stack */
 #define SUNXI_STACKSIZE_FIQ    (4*1024)        /* FIQ stack */
 
+#ifdef FTRACE
+  #ifndef CONFIG_TRACE_EARLY_ADDR
+    /* default value, can be overwirtten somewhere else */
+    #define CONFIG_TRACE
+    #define CONFIG_CMD_TRACE
+    #define CONFIG_TRACE_BUFFER_SIZE	(16 << 20)
+    #define CONFIG_TRACE_EARLY_SIZE		(5 << 20)
+    #define CONFIG_TRACE_EARLY
+    #define CONFIG_TRACE_EARLY_ADDR		0x40000000
+  #endif
+#endif
+
 #ifdef CONFIG_SUNXI_DEBUG
 #define DEBUG
 #endif

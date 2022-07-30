@@ -182,7 +182,6 @@ long eink_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 	unsigned long karg[4];
 	unsigned long ubuffer[4] = { 0 };
 	struct eink_manager *eink_mgr = NULL;
-	const unsigned int eink_lyr_cfg2_size = ARRAY_SIZE(eink_lyr_cfg2);
 
 	eink_mgr = g_eink_drvdata.eink_mgr;
 
@@ -203,16 +202,6 @@ long eink_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 			s32 i = 0;
 			struct eink_img last_img;
 			struct eink_img cur_img;
-
-			if (IS_ERR_OR_NULL((void __user *)ubuffer[2])) {
-				__wrn("incoming pointer of user is ERR or NULL");
-				return -EFAULT;
-			}
-			if (ubuffer[1] == 0 || ubuffer[1] > eink_lyr_cfg2_size) {
-				__wrn("layer number need to be set from 1 to %d\n", eink_lyr_cfg2_size);
-				return -EFAULT;
-			}
-
 			if (!eink_mgr) {
 				pr_err("there is no eink manager!\n");
 				break;

@@ -83,6 +83,10 @@ static void aw_spinand_init_mtd_info(struct aw_spinand_chip *chip,
 	mtd->oobavail = AW_OOB_SIZE_PER_PHY_PAGE;
 	mtd->subpage_sft = 0;
 #endif
+
+#ifdef CONFIG_AW_MTD_SPINAND_OOB_RAW_SPARE
+	mtd->oobavail = mtd->oobsize;
+#endif
 	mtd->writebufsize = info->page_size(chip);
 	mtd->size = info->total_size(chip);
 	mtd->name = "nand0";
@@ -188,7 +192,7 @@ static int aw_spinand_read_oob(struct mtd_info *mtd, loff_t from,
 
 	if (from < 0 || from >= mtd->size || ops->len > mtd->size - from)
 		return -EINVAL;
-	if (!ops->len)
+	if (!ops->len && !ops->ooblen)
 		return 0;
 
 	pr_debug("calling read with oob: from 0x%llx datalen %d ooblen %d\n",
@@ -256,7 +260,7 @@ static int aw_spinand_write_oob(struct mtd_info *mtd, loff_t to,
 
 	if (to < 0 || to >= mtd->size || ops->len > mtd->size - to)
 		return -EOVERFLOW;
-	if (!ops->len)
+	if (!ops->len && !ops->ooblen)
 		return 0;
 	/*
 	 * if enable SIMULATE_MULTIPLANE, will eanble subpage too.
@@ -420,7 +424,8 @@ int aw_spinand_probe(struct udevice *dev)
 		goto err_spinand_cleanup;
 
 #ifdef CONFIG_SPI_SAMP_DL_EN
-	if (get_boot_work_mode() == 16)
+	if (get_boot_work_mode() == WORK_MODE_USB_PRODUCT ||
+			get_boot_work_mode() == WORK_MODE_CARD_PRODUCT)
 		update_right_delay_para(mtd);
 	else {
 		set_right_delay_para(mtd);

@@ -126,6 +126,7 @@
 #define SPINOR_OP_WD_EVCR      0x61    /* Write EVCR register */
 
 /* used for EON flash*/
+#define SPINOR_OP_WREN_VSR      0x50    /* Write enable for Volatile Status Register */
 #define SPINOR_OP_RDCR_EON	0x09	/* Read EON configuration register */
 #define SPINOR_OP_EXIT_OTP	0x04	/* exit otp mode*/
 #define SPINOR_OP_ENTER_OTP	0x3a	/* enter otp mode*/
@@ -148,6 +149,8 @@
 #define SR_BP0			BIT(2)	/* Block protect 0 */
 #define SR_BP1			BIT(3)	/* Block protect 1 */
 #define SR_BP2			BIT(4)	/* Block protect 2 */
+#define SR_BP3			BIT(5)	/* Block protect 3 */
+#define SR_BP4			BIT(6)	/* Block protect 4 */
 #define SR_TB			BIT(5)	/* Top/Bottom protect */
 #define SR_SRWD			BIT(7)	/* SR write protect */
 /* Spansion/Cypress specific status bits */
@@ -155,6 +158,10 @@
 #define SR_P_ERR		BIT(6)
 
 #define SR_QUAD_EN_MX		BIT(6)	/* Macronix Quad I/O */
+#define CR_TB_MX		BIT(3)  /* Macronix Top/Bottom protect */
+#define SCUR_WPSEL_MX           BIT(7)  /* Macronix WPSEL bit */
+#define OTP_SR_TB_EON		BIT(3)	/* Eon Top/Bottom protect */
+#define SR2_CMP_GD		BIT(6)  /* Gigadevice CMP bit */
 
 /* Enhanced Volatile Configuration Register bits */
 #define EVCR_QUAD_EN_MICRON	BIT(7)	/* Micron Quad I/O */
@@ -266,6 +273,10 @@ enum spi_nor_option_flags {
 	SNOR_F_READY_XSR_RDY	= BIT(4),
 	SNOR_F_USE_CLSR		= BIT(5),
 	SNOR_F_BROKEN_RESET	= BIT(6),
+	SNOR_F_HAS_4BAIT	= BIT(7),
+	SNOR_F_HAS_LOCK		= BIT(8),
+	SNOR_F_INDIVIDUAL_LOCK	= BIT(9),
+	SNOR_F_HAS_LOCK_HANDLE	= BIT(10),
 };
 
 /**
@@ -436,6 +447,14 @@ struct spi_nor_hwcaps {
 #define SNOR_HWCAPS_PP_1_1_8	BIT(20)
 #define SNOR_HWCAPS_PP_1_8_8	BIT(21)
 #define SNOR_HWCAPS_PP_8_8_8	BIT(22)
+
+struct nor_protection {
+    unsigned int boundary; /* protected addr [0, boundary) */
+    int bp:8;
+    int flag:24;
+#define SET_TB BIT(0)
+#define SET_CMP BIT(1)
+};
 
 /**
  * spi_nor_scan() - scan the SPI NOR

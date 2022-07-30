@@ -107,6 +107,13 @@ config SUNXI_WDT_V2
 		version2 watch dog, work as a independent peripheral
 		no longer included in a timer
 
+config SUNXI_SECURE_CRYPTO
+    bool "sunxi secure crypto"
+    default n
+    help
+    Select this for sunxi SoCs which the ce can use the secure key to crypt.
+
+
 choice
 	prompt "Sunxi SoC Variant"
 	optional

@@ -84,7 +84,7 @@
 #define CONFIG_HARD_CHECKSUM
 #endif
 #define CONFIG_SUNXI_EXT_PHY
-#elif defined(CONFIG_MACH_SUN8IW20) || defined(CONFIG_MACH_SUN20IW1)
+#elif defined(CONFIG_MACH_SUN8IW20) || defined(CONFIG_MACH_SUN20IW1) || defined(CONFIG_MACH_SUN8IW21)
 #define IOBASE                  0x04500000
 #define PHY_CLK_REG             (0x03000000 + 0x30)  /* SYS_CFG_BASE + EMAC_EPHY_CLK_REG0 */
 #define CCMU_BASE               0x02001000  /* CCMU Base Address */
@@ -96,6 +96,11 @@
 #define DISABLE_AUTONEG
 //#define CONFIG_HARD_CHECKSUM	/* EMAC_RX_CTL0 bit27: CHECK_CRC */
 #define CONFIG_SUNXI_EXT_PHY
+
+#ifdef CONFIG_MACH_SUN8IW21
+#define NOT_SUPPORT_NOCACHED_ALLOC
+#define CONFIG_HARD_CHECKSUM
+#endif
 
 #ifdef CONFIG_MACH_SUN20IW1
 /*
@@ -703,7 +708,7 @@ static int geth_sys_init(void)
     || defined(CONFIG_SUN8IW12P1_NOR) || defined(CONFIG_MACH_SUN50IW9) \
     || defined(CONFIG_MACH_SUN8IW19) \
     || defined(CONFIG_MACH_SUN8IW20) || defined(CONFIG_MACH_SUN20IW1) \
-    || defined(CONFIG_MACH_SUN50IW10)
+    || defined(CONFIG_MACH_SUN50IW10) || defined(CONFIG_MACH_SUN8IW21)
 	reg_val = readl((void *)(unsigned long)(CCMU_BASE + CCMU_GMAC_CLK_REG));
 	reg_val |= (1 << CCMU_GMAC_RST_BIT);   /* Reset Deassert */
 	reg_val |= (1 << CCMU_GMAC_GATING_BIT);
@@ -724,7 +729,7 @@ static int geth_sys_init(void)
 		reg_val = readl((void *)(unsigned long)(CCMU_BASE + CCMU_EPHY_CLK_REG));
 #if defined(CONFIG_MACH_SUN50IW9) || defined(CONFIG_MACH_SUN8IW19) || \
     defined(CONFIG_MACH_SUN8IW20) || defined(CONFIG_MACH_SUN20IW1) || \
-    defined(CONFIG_MACH_SUN50IW10)
+    defined(CONFIG_MACH_SUN50IW10) || defined(CONFIG_MACH_SUN8IW21)
 		/* set CCMU_EPHY_CLK_REG's bit30 and bit31 to 1 */
 		reg_val |= (3 << (CCMU_EPHY_GATING_BIT - 1));
 #else

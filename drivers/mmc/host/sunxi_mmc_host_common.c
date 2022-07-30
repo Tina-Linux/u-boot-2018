@@ -363,6 +363,7 @@ static void mmc_get_para_from_fex(int sdc_no)
 	char ctmp[30];
 	u32 handle[10] = {0};
 	user_gpio_set_t card_pwr_gpio;
+	u32 rval_64bit_H32, rval_64bit_L32;
 
 	if (sdc_no == 0) {
 		nodeoffset =  fdt_path_offset(working_fdt, FDT_PATH_CARD0_BOOT_PARA);
@@ -1112,6 +1113,36 @@ static void mmc_get_para_from_fex(int sdc_no)
 			else
 				cfg->tune_limit_kernel_timing = 0x1;
 			MMCDBG("get sdc2 sdc_kernel_no_limit 0x%x, limit 0x%x.\n", rval, cfg->tune_limit_kernel_timing);
+		}
+
+		ret = fdt_getprop_u32(working_fdt, nodeoffset, "ffu_src_fw_version_H32", (uint32_t *)(&rval_64bit_H32));
+		if (ret < 0) {
+			MMCDBG("get sdc2 ffu_src_fw_version_H32 fail.\n");
+			cfg->ffu_src_fw_version = 0x0;
+		} else {
+			ret = fdt_getprop_u32(working_fdt, nodeoffset, "ffu_src_fw_version_L32", (uint32_t *)(&rval_64bit_L32));
+			if (ret < 0) {
+				MMCDBG("get sdc2 ffu_src_fw_version_L32 fail.\n");
+				cfg->ffu_src_fw_version = 0x0;
+			} else {
+				cfg->ffu_src_fw_version = ((u64)rval_64bit_H32) << 32 | rval_64bit_L32 ;
+				MMCDBG("get sdc2 ffu_src_fw_version 0x%llx.\n", cfg->ffu_src_fw_version);
+			}
+		}
+
+		ret = fdt_getprop_u32(working_fdt, nodeoffset, "ffu_dest_fw_version_H32", (uint32_t *)(&rval_64bit_H32));
+		if (ret < 0) {
+			MMCDBG("get sdc2 ffu_dest_fw_version_H32 fail.\n");
+			cfg->ffu_dest_fw_version = 0x0;
+		} else {
+			ret = fdt_getprop_u32(working_fdt, nodeoffset, "ffu_dest_fw_version_L32", (uint32_t *)(&rval_64bit_L32));
+			if (ret < 0) {
+				MMCDBG("get sdc2 ffu_dest_fw_version_L32 fail.\n");
+				cfg->ffu_dest_fw_version = 0x0;
+			} else {
+				cfg->ffu_dest_fw_version = ((u64)rval_64bit_H32) << 32 | rval_64bit_L32 ;
+				MMCDBG("get sdc2 ffu_dest_fw_version 0x%llx.\n", cfg->ffu_dest_fw_version);
+			}
 		}
 
 		//dumphex32("gpio_config", (char *)SUNXI_PIO_BASE + 0x48, 0x10);

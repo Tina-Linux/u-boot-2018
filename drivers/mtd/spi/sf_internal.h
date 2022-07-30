@@ -66,6 +66,7 @@ struct flash_info {
 #define SPI_NOR_SKIP_SFDP	BIT(13)	/* Skip parsing of SFDP tables */
 #define USE_CLSR		BIT(14)	/* use CLSR command */
 #define SPI_NOR_INDIVIDUAL_LOCK BIT(16) /* individual block/sector lock mode */
+#define SPI_NOR_HAS_LOCK_HANDLE BIT(17) /* OP/ERASE for lock operation */
 };
 
 extern const struct flash_info spi_nor_ids[];
@@ -100,12 +101,14 @@ int spi_flash_mtd_register(struct spi_flash *flash);
 void spi_flash_mtd_unregister(void);
 #endif
 
-
+#define SPINOR_BOOT_PARAM_MAGIC	"NORPARAM"
 typedef struct {
+	u8	magic[8];
 	__s32	readcmd;
 	__s32	read_mode;
 	__s32	write_mode;
 	__s32	flash_size;
+	__s32	addr4b_opcodes;
 	__s32	erase_size;
 	__s32	delay_cycle;/*When the frequency is greater than 60MHZ configured as 1;less than 24MHZ configured as 2;greater 24MHZ and less 60HZ as 3*/
 	__s32	lock_flag;

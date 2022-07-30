@@ -22,6 +22,8 @@
 #include <asm/arch/clock.h>
 #include <fdt_support.h>
 #include <private_boot0.h>
+#include <private_toc.h>
+#include <dm.h>
 
 #include "spic.h"
 #include "../sunxi-spinand.h"
@@ -193,7 +195,7 @@ static int spic0_set_clk(unsigned int clk)
 	return 0;
 }
 
-#ifdef SPIC_DEBUG
+#if SPIC_DEBUG
 static void spi_print_info(void)
 {
 	char buf[1024] = {0};
@@ -279,7 +281,7 @@ int spic0_init(void)
 	set_reg(SPI_FCR, SPI_TXFIFO_RST | (SPI_TX_WL << 16) | SPI_RX_WL);
 	set_reg(SPI_IER, SPI_ERROR_INT);
 
-#ifdef SPIC_DEBUG
+#if SPIC_DEBUG
 	spi_print_info();
 #endif
 	return 0;
@@ -717,6 +719,7 @@ static void spic0_set_sample_delay(unsigned int sample_delay)
 
 	rval |= sample_delay;
 	set_reg(SPI_SDC, rval);
+	mdelay(1);
 }
 
 int update_right_delay_para(struct mtd_info *mtd)
@@ -724,11 +727,11 @@ int update_right_delay_para(struct mtd_info *mtd)
 	struct aw_spinand *spinand = mtd_to_spinand(mtd);
 	unsigned int sample_delay;
 	unsigned int start_backup = 0, end_backup = 0;
-	unsigned int mode, startry_mode = 0, endtry_mode = 6, block = 0;
+	unsigned int mode = 0, startry_mode = 0, endtry_mode = 6, block = 0;
 	unsigned int ret, val;
 	int fdt_off;
 	unsigned int half_cycle_ps, sample_delay_ps = 160;
-	unsigned int min_delay = 0, max_delay = 0, right_sample_delay;
+	unsigned int min_delay = 0, max_delay = 0, right_sample_delay = 0;
 
 	size_t retlen;
 	u_char *cache_source;
@@ -741,7 +744,7 @@ int update_right_delay_para(struct mtd_info *mtd)
 	instr.len = (endtry_mode - startry_mode + 1) * mtd->erasesize;
 
 	spinand->msglevel &= ~SPINAND_MSG_EN;
-	cache_boot0 = calloc(1, instr.len);
+	cache_boot0 = malloc_align(instr.len, 64);
 	mtd->_read(mtd, instr.addr, instr.len, &retlen, cache_boot0);
 	mtd->_erase(mtd, &instr);
 
@@ -760,8 +763,8 @@ int update_right_delay_para(struct mtd_info *mtd)
 	/* How much (ps) is required for half a cycle */
 	half_cycle_ps = 1 * 1000 * 1000  / (val / 1000 / 1000) / 2;
 
-	cache_source = calloc(1, len);
-	cache_target = calloc(1, len);
+	cache_source = malloc_align(len, 64);
+	cache_target = malloc_align(len, 64);
 	memset(cache_source, 0xa5, len);
 
 	spic0_samp_mode(1);
@@ -834,11 +837,11 @@ int update_right_delay_para(struct mtd_info *mtd)
 		spic0_samp_mode(0);
 		spic0_samp_dl_sw_status(0);
 		if ((val / 1000 / 1000) >= 60)
-			spinand->right_sample_mode = DELAY_1_CYCLE_SAMPLE;
+			spinand->right_sample_mode = 2;
 		else if ((val / 1000 / 1000) <= 24)
-			spinand->right_sample_mode = DELAY_NORMAL_SAMPLE;
+			spinand->right_sample_mode = 0;
 		else
-			spinand->right_sample_mode = DELAY_0_5_CYCLE_SAMPLE;
+			spinand->right_sample_mode = 1;
 	} else {
 
 		spinand->right_sample_delay =
@@ -847,7 +850,7 @@ int update_right_delay_para(struct mtd_info *mtd)
 			right_sample_delay / half_cycle_ps;
 		spic0_set_sample_delay(spinand->right_sample_delay);
 	}
-	pr_info("Sample mode:%d  min_delay:%d max_delay:%d right_delay:%d)\n",
+	pr_info("Sample mode:%d  min_delay:%d max_delay:%d right_delay:%x)\n",
 			spinand->right_sample_mode,
 			min_delay, max_delay,
 			spinand->right_sample_delay);
@@ -856,38 +859,50 @@ int update_right_delay_para(struct mtd_info *mtd)
 	mtd->_write(mtd, instr.addr, instr.len, &retlen, cache_boot0);
 
 	spinand->msglevel |= SPINAND_MSG_EN;
-	free(cache_source);
-	free(cache_target);
-	free(cache_boot0);
+	free_align(cache_source);
+	free_align(cache_target);
+	free_align(cache_boot0);
 	return 0;
 }
 
 int set_right_delay_para(struct mtd_info *mtd)
 {
 	struct aw_spinand *spinand = mtd_to_spinand(mtd);
-	boot0_file_head_t *boot0;
+	u_char *buffer;
 	boot_spinand_para_t *boot_info;
 	size_t retlen;
-	boot0 = calloc(1, 2048);
+	buffer = calloc(1, 2048);
 
-	mtd->_read(mtd, 0, 2048, &retlen, (u_char *)boot0);
+	mtd->_read(mtd, 0, 2048, &retlen, buffer);
 
-	boot_info = (boot_spinand_para_t *)boot0->prvt_head.storage_data;
+	if (gd->bootfile_mode  == SUNXI_BOOT_FILE_NORMAL
+		 || gd->bootfile_mode  == SUNXI_BOOT_FILE_PKG) {
+		boot0_file_head_t *boot0  = (boot0_file_head_t *)buffer;
+		boot_info = (boot_spinand_para_t *)boot0->prvt_head.storage_data;
+	} else {
+		sbrom_toc0_config_t *toc0_config = NULL;
+		toc0_config = (sbrom_toc0_config_t *)(buffer + 0x80);
+		boot_info = (boot_spinand_para_t *)toc0_config->storage_data;
+	}
 
-	pr_info("spinand sample_mode:%d sample_delay:%d\n",
+	pr_alert("spinand sample_mode:%x sample_delay:%x\n",
 			boot_info->sample_mode, boot_info->sample_delay);
-	spic0_set_sample_mode(boot_info->sample_mode);
 
-	if (boot_info->sample_delay != 0xaaaaffff) {
+	if ((boot_info->sample_delay || boot_info->sample_mode) &&
+			boot_info->sample_delay != 0xaaaaffff &&
+			boot_info->sample_delay < 64) {
 		spic0_samp_mode(1);
 		spic0_samp_dl_sw_status(1);
+		spic0_set_sample_mode(boot_info->sample_mode);
 		spic0_set_sample_delay(boot_info->sample_delay);
 		spinand->right_sample_delay = boot_info->sample_delay;
 		spinand->right_sample_mode = boot_info->sample_mode;
-	}
 
-	spic0_set_clk(boot_info->FrequencePar);
-	free(boot0);
+		spic0_set_clk(boot_info->FrequencePar);
+	} else
+		spic0_change_mode(boot_info->FrequencePar);
+
+	free(buffer);
 	return 0;
 }
 

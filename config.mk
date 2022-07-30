@@ -63,6 +63,17 @@ ifdef FTRACE
 PLATFORM_CPPFLAGS += -finstrument-functions -DFTRACE
 endif
 
+ifeq ($(CONFIG_SUNXI_TRACE),y)
+#PLATFORM_CPPFLAGS += -finstrument-functions -DFTRACE
+PLATFORM_CPPFLAGS += -DFTRACE
+
+# cpu related function will freeze cpu, never trace them
+PLATFORM_CPPFLAGS += -finstrument-functions-exclude-file-list=arch/arm/cpu/
+PLATFORM_CPPFLAGS += -finstrument-functions-exclude-file-list=arch/riscv/cpu/
+# serial command line may contaminate trace result, so dont trace those function
+PLATFORM_CPPFLAGS += -finstrument-functions-exclude-file-list=common/cli
+endif
+
 # Allow use of stdint.h if available
 ifneq ($(USE_STDINT),)
 PLATFORM_CPPFLAGS += -DCONFIG_USE_STDINT
@@ -74,6 +85,7 @@ RELFLAGS := $(PLATFORM_RELFLAGS)
 
 PLATFORM_CPPFLAGS += $(RELFLAGS)
 PLATFORM_CPPFLAGS += -pipe
+
 
 LDFLAGS += $(PLATFORM_LDFLAGS)
 LDFLAGS_FINAL += -Bstatic

@@ -32,16 +32,20 @@ CONFIG_SYS_SUNXI_I2C0_SLAVE=0x68
 
 extern void papyrus_set_i2c_address(int address);
 
+int old_twi_id;
+
 #define TPSDEBUG(n, args...)				\
 	do {						\
-		if (n)					\
-		printf(args);		\
+		if (n == 1)					\
+		pr_debug(args);		\
+		else if (n == 2) \
+		pr_err(args);		\
 	} while (0)
 
 #define _debug(args...)	TPSDEBUG(1, args)
 #define _info(args...)	TPSDEBUG(1, args)
-#define _warn(args...)	TPSDEBUG(1, args)
-#define _err(args...)	TPSDEBUG(1, args)
+#define _warn(args...)	TPSDEBUG(2, args)
+#define _err(args...)	TPSDEBUG(2, args)
 
 typedef struct {
 	char  gpio_name[32];
@@ -480,6 +484,9 @@ static int papyrus_hw_init(struct papyrus_sess *sess, PMIC_ID pmic_id)
 		_info("not master pmic, do not control gpio\n");
 		return 0;
 	}
+	eink_sys_gpio_set_direction(sess->wake_up_pin, 1, "tps65185_wakeup");
+	eink_sys_gpio_set_value(sess->wake_up_pin, sess->wakeup_active_high, "tps65185_wakeup");
+	msleep(PAPYRUS_POWER_UP_DELAY_MS);
 
 #if (CONTRUL_POWER_UP_PING)
 	//make sure power up is low
@@ -487,15 +494,7 @@ static int papyrus_hw_init(struct papyrus_sess *sess, PMIC_ID pmic_id)
 	eink_sys_gpio_set_direction(sess->power_up_pin, 1, "tps65185_powerup");
 	eink_sys_gpio_set_value(sess->power_up_pin, !sess->power_active_heght, "tps65185_powerup");
 	//eink_sys_gpio_set_value(sess->power_up_pin, sess->power_active_heght, "tps65185_powerup");
-	msleep(PAPYRUS_POWER_UP_DELAY_MS);
 #endif
-	eink_sys_gpio_set_direction(sess->wake_up_pin, 1, "tps65185_wakeup");
-	eink_sys_gpio_set_value(sess->wake_up_pin, !sess->wakeup_active_high, "tps65185_wakeup");
-
-	/* wait to reset papyrus */
-	msleep(PAPYRUS_SLEEP_MINIMUM_MS);
-	//eink_sys_gpio_set_direction(sess->wake_up_pin, 1, "tps65185_wakeup");
-	eink_sys_gpio_set_value(sess->wake_up_pin, sess->wakeup_active_high, "tps65185_wakeup");
 
 	eink_sys_gpio_set_direction(sess->vcom_ctl_pin, 1, "tps65185_vcom");
 	eink_sys_gpio_set_value(sess->vcom_ctl_pin, sess->vcomctl_active_high, "tps65185_vcom");
@@ -864,6 +863,7 @@ static int tps65185_probe(void)
 	config = &g_pmic_mgr->config[pmic_id];
 
 	/* must config the i2c enable */
+	old_twi_id = i2c_get_bus_num();
 	ret = i2c_set_bus_num(config->twi_id);
 	if (ret) {
 		_err("[%s]: set i2c bus(%d) fail\n", __func__, ret);
@@ -1128,6 +1128,11 @@ void  tps65185_exit(void)
 	return;
 }
 
+void tps65185_return_main_i2c(void)
+{
+	i2c_set_bus_num(old_twi_id);
+}
+
 int tps65185_vcom_set(int vcom_mv)
 {
 	struct pmic_sess *master_pmsess = NULL, *tmp_pmsess = NULL;
@@ -1175,21 +1180,23 @@ int tps65185_vcom_set(int vcom_mv)
 		tmp_sess->vcom2 |= 1 << PAPYRUS_VCOM2_PROG;
 		stat |= papyrus_hw_setreg(tmp_sess, PAPYRUS_ADDR_VCOM2_ADJUST, tmp_sess->vcom2);
 		rev_val = 0;
-		while (!(rev_val & (1 << PAPYRUS_INT_STATUS1_PRGC))) {
-			stat |= papyrus_hw_getreg(tmp_sess, PAPYRUS_ADDR_INT_STATUS1, &rev_val);
+		while (1) {
 			pr_debug("PAPYRUS_ADDR_INT_STATUS1 = 0x%x\n", rev_val);
-			msleep(50);
+			stat |= papyrus_hw_getreg(tmp_sess, PAPYRUS_ADDR_INT_STATUS1, &rev_val);
+			if (!(rev_val & (1 << PAPYRUS_INT_STATUS1_PRGC)))
+				break;
 			if (cnt-- <= 0) {
 				_err("PMIC%d: set vcom timeout\n", id);
 				break;
 			}
+			msleep(10);
 		}
 	}
 
 	if (stat)
 		_err("papyrus: I2C error: %d\n", stat);
 	else
-		pr_info("[%s]: Success!\n", __func__);
+		pr_info("[%s] set vcom %d v success!\n", __func__, vcom_mv);
 
 	return 0;
 }

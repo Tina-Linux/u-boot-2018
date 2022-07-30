@@ -35,7 +35,6 @@ static int mmc_power_cycle(struct mmc *mmc);
 int mmc_decode_ext_csd(struct mmc *mmc, struct mmc_ext_csd *dec_ext_csd, u8 *ext_csd);
 int mmc_set_bus_width(struct mmc *mmc, uint width);
 
-extern int sunxi_mmc_ffu(struct mmc *mmc);
 extern void dumphex32(char *name, char *base, int len);
 extern int mmc_mmc_switch_bus_mode(struct mmc *mmc, int spd_mode, int width);
 extern char *spd_name[];
@@ -3279,9 +3278,9 @@ void mmc_update_config_for_dragonboard(int card_no)
 	if (nodeoffset < 0) {
 		MMCINFO("can't find node \"%s\" try sunxi_mmc\n", prop_path);
 		if (card_no == 2)
-			strcpy(prop_path, "suxni_mmc2");
+			strcpy(prop_path, "sunxi-mmc2");
 		else
-			strcpy(prop_path, "sunxi_mmc3");
+			strcpy(prop_path, "sunxi-mmc3");
 
 		nodeoffset = fdt_path_offset(working_fdt, prop_path);
 		if (nodeoffset < 0) {
@@ -3356,11 +3355,11 @@ void mmc_update_config_for_sdly(struct mmc *mmc)
 	if (nodeoffset < 0) {
 		MMCINFO("can't find node \"%s\" try sunxi-mmc\n", prop_path);
 		if (priv->mmc_no == 2)
-			strcpy(prop_path, "sunxi_mmc2");
+			strcpy(prop_path, "sunxi-mmc2");
 		else if (priv->mmc_no == 0)
-			strcpy(prop_path, "sunxi_mmc0");
+			strcpy(prop_path, "sunxi-mmc0");
 		else
-			strcpy(prop_path, "sunxi_mmc3");
+			strcpy(prop_path, "sunxi-mmc3");
 		nodeoffset = fdt_path_offset(working_fdt, prop_path);
 		if (nodeoffset < 0) {
 			MMCINFO("can't find node \"%s\" \n",
@@ -3772,6 +3771,50 @@ retry:
 	return err;
 }
 
+#ifdef SUPPORT_SUNXI_MMC_FFU
+extern int mmc_judge_updata_success(struct mmc *mmc);
+extern int sunxi_mmc_ffu(struct mmc *mmc);
+
+int emmc_updata_firmware(struct mmc *mmc)
+{
+	int ret = 0;
+
+	MMCINFO("=====================ffu start===================================\n");
+	if (mmc->cfg->ffu_src_fw_version == 0 || mmc->cfg->ffu_dest_fw_version == 0) {
+		MMCINFO("%s: ffu version fail\n", __FUNCTION__);
+		return -1;
+	}
+	MMCINFO("src_version = 0x%llx, desc_version = 0x%llx\n", mmc->cfg->ffu_src_fw_version, mmc->cfg->ffu_dest_fw_version);
+	ret = sunxi_mmc_ffu(mmc);
+	if (ret) {
+		MMCINFO("%s: sunxi mmc ffu fail, err %d\n", __FUNCTION__, ret);
+		return ret;
+	}
+
+	mdelay(1000);
+	mmc->has_init = 0;
+
+	if (!mmc->init_in_progress)
+		ret = mmc_start_init(mmc);
+	if (!ret)
+		ret = mmc_complete_init(mmc);
+	if (ret) {
+		MMCINFO("%s: mmc init fail, err %d\n", __FUNCTION__, ret);
+		return ret;
+	}
+
+	ret = mmc_judge_updata_success(mmc);
+	if (ret) {
+		MMCINFO("%s: mmc judge updata fail, err %d\n", __FUNCTION__, ret);
+		return ret;
+	}
+
+	MMCINFO("=====================ffu success===================================\n");
+
+	return ret;
+}
+#endif
+
 int mmc_init(struct mmc *mmc)
 {
 	struct sunxi_mmc_priv *priv = mmc->priv;
@@ -3814,6 +3857,14 @@ int mmc_init(struct mmc *mmc)
 			MMCINFO("%s: mmc init fail, err %d\n", __FUNCTION__, err);
 			goto ERR_RET;
 		}
+
+#ifdef SUPPORT_SUNXI_MMC_FFU
+		err = emmc_updata_firmware(mmc);
+		if (err) {
+			MMCINFO("=====================ffu fail===================================\n");
+			goto ERR_RET;
+		}
+#endif
 
 		if (work_mode == WORK_MODE_BOOT && cfg->sample_mode == AUTO_SAMPLE_MODE) {
 			if (cfg->force_boot_tuning)

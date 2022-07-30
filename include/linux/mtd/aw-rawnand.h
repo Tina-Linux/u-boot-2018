@@ -1084,7 +1084,7 @@ struct aw_nand_chip {
 	uint8_t id[RAWNAND_MAX_ID_LEN];
 	unsigned int dies;
 #define MAX_DIES (2U)
-	unsigned int diesize[MAX_DIES];
+	uint64_t diesize[MAX_DIES];
 	int chips;
 	uint64_t chipsize;
 	uint64_t simu_chipsize;

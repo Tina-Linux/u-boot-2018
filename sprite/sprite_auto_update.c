@@ -953,6 +953,7 @@ int do_auto_update_check(cmd_tbl_t *cmdtp, int flag, int argc, char *const argv[
 			}
 		}
 	}
+	sunxi_flash_write_end();
 	return 0;
 }
 U_BOOT_CMD(auto_update_check, CONFIG_SYS_MAXARGS, 1, do_auto_update_check,

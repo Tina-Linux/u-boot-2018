@@ -638,21 +638,25 @@ int nand_check_partitions_consistent_legal(struct nand_partitions *new, struct n
 		return 0;
 
 	/*some a100 a133 boards's parts force to one parts*/
-	if (old->nc == 1 && old->size == new->size) {
-		pr_info("special machine: old parts count is one, old part size%u is the same with new size@%u\n", old->size, new->size);
+	if (old->nc == 1) {
+		/*pr_info("special machine: old parts count is one, old part size%u is the same with new size@%u\n", old->size, new->size);*/
 		return 0;
 	}
 	if (new->nc != old->nc) {
-		pr_err("update parts count is inconsistent [%d-%d]\n", new->nc, old->nc);
+		pr_err("update parts count is inconsistent [new@%d-old@%d]\n", new->nc, old->nc);
+		pr_err("stop run\n");
+		asm("b .");
 		return NAND_PARTS_COUNT_INCONSISTENT;
 	}
 
-	for (p = 0; p < new->nc; p++) {
+	/*don't check udisk*/
+	for (p = 0; p < new->nc - 1; p++) {
 		pr_info("new->parts[%d].from:%u ,old->parts[%d].from:%u\n", p, new->parts[p].from, p, old->parts[p].from);
 		pr_info("new->parts[%d].size:%u ,old->parts[%d].size:%u\n", p, new->parts[p].size, p, old->parts[p].size);
 		if (new->parts[p].from != old->parts[p].from ||
 				new->parts[p].size != old->parts[p].size) {
-			pr_err("update parts size is inconsitent\n");
+			pr_err("update parts size is inconsitent\nplease check partitions size\n stop run\n");
+			asm("b .");
 			return NAND_PARTS_SIZE_INCONSISTENT;
 		}
 	}

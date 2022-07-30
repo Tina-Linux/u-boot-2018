@@ -1738,6 +1738,11 @@ config CMD_SUNXI_TIMER
 	help
 	  Activate this option to test sunxi timer.
 
+config CMD_SUNXI_CLK
+	bool "clk test"
+	help
+	  Activate this option to test sunxi clk.
+
 config CMD_SUNXI_SPRITE
 	bool "sprite test"
 	help
@@ -1810,5 +1815,10 @@ config CMD_SUNXI_CE_TEST
 	help
 	  enable test for ce api
 
+config CMD_SUNXI_SYSRECOVERY_TEST
+	bool "sunxi sysrecovery test cmd"
+	default n
+	help
+	  enable test for sysrecovery test api
 
 endmenu 

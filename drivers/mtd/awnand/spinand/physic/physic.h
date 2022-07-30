@@ -8,8 +8,8 @@
 #include <linux/printk.h>
 
 #define AW_SPINAND_PHY_VER_MAIN		0x01
-#define AW_SPINAND_PHY_VER_SUB		0x09
-#define AW_SPINAND_PHY_VER_DATE		0x20200306
+#define AW_SPINAND_PHY_VER_SUB		0x11
+#define AW_SPINAND_PHY_VER_DATE		0x20211217
 
 #define SECTOR_SHIFT 9
 

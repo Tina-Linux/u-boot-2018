@@ -22,6 +22,7 @@
 #include <boot_gui.h>
 #include <fastlogo.h>
 #include <sys_partition.h>
+#include <sunxi_eink.h>
 
 DECLARE_GLOBAL_DATA_PTR;
 
@@ -71,6 +72,16 @@ int sprite_cartoon_screen_set(void)
 					   &sprite_source.screen_buf);
 	}
 
+#endif
+#if defined(CONFIG_EINK200_SUNXI)
+	struct eink_fb_info_t *p_info = eink_get_fb_inst();
+	if (p_info) {
+		sprite_source.screen_width = p_info->p_rgb->width;
+		sprite_source.screen_height = p_info->p_rgb->height;
+		sprite_source.screen_buf = (char *)p_info->p_rgb->addr;
+		p_info->update_all_en(p_info, 0);
+		p_info->set_update_mode(p_info, EINK_GU16_MODE);
+	}
 #endif
 
 	if ((sprite_source.screen_width < 40) ||

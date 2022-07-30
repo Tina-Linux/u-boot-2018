@@ -655,6 +655,40 @@ int secure_os_memory_init(void)
 }
 #endif
 
+#if defined CONFIG_SUN50IW9_AUTOPRINT
+int check_printmode(void)
+{
+	u32 reg, data;
+	reg  = readl(0x0300B0B4);
+	data = reg & (0x7 << 16);
+	data |= reg & (0x7 << 8);
+	/* if PF2 --> TX, PF4 --> RX */
+	if (data == 0x00030300) {
+		pr_info(" card print\n");
+		return 1;
+	}
+	return 0;
+}
+
+int open_autoprint(void)
+{
+	int nodeoffset, err;
+	nodeoffset = fdt_path_offset(working_fdt, "/soc/auto_print");
+	if (nodeoffset < 0) {
+		pr_err("libfdt fdt_path_offset() returned %s\n",
+		       fdt_strerror(nodeoffset));
+		return -1;
+	}
+	err = fdt_setprop_string(working_fdt, nodeoffset, "status", "okay");
+	if (err < 0) {
+		pr_warn("WARNING: fdt_setprop can't set %s from node %s: %s\n",
+			"compatible", "status", fdt_strerror(err));
+		return -1;
+	}
+	return 0;
+}
+#endif
+
 int sunxi_update_fdt_para_for_kernel(void)
 {
 	uint storage_type = 0;
@@ -720,26 +754,26 @@ int sunxi_update_fdt_para_for_kernel(void)
 		break;
 	case STORAGE_EMMC:
 		fdt_enable_node("mmc2", 1);
-		fdt_enable_node("sunxi_mmc2", 1);
+		fdt_enable_node("sunxi-mmc2", 1);
 		break;
 	case STORAGE_EMMC0:
 		fdt_enable_node("mmc0", 1);
-		fdt_enable_node("sunxi_mmc0", 1);
+		fdt_enable_node("sunxi-mmc0", 1);
 		break;
 	case STORAGE_EMMC3:
 		fdt_enable_node("mmc3", 1);
-		fdt_enable_node("sunxi_mmc3", 1);
+		fdt_enable_node("sunxi-mmc3", 1);
 		break;
 	case STORAGE_SD:
 		fdt_enable_node("mmc0", 1);
-		fdt_enable_node("sunxi_mmc0", 1);
+		fdt_enable_node("sunxi-mmc0", 1);
 		{
 			uint32_t dragonboard_test = 0;
 			script_parser_fetch("/soc/target", "dragonboard_test",
 						(int *)&dragonboard_test, 0);
 			if (dragonboard_test == 1) {
 				fdt_enable_node("mmc2", 1);
-				fdt_enable_node("sunxi_mmc2", 1);
+				fdt_enable_node("sunxi-mmc2", 1);
 #ifdef CONFIG_SUNXI_SDMMC
 				mmc_update_config_for_dragonboard(2);
 #ifdef CONFIG_MMC3_SUPPORT
@@ -792,11 +826,6 @@ int sunxi_update_fdt_para_for_kernel(void)
 	}
 #endif
 #ifdef CONFIG_SPI_SAMP_DL_EN
-#ifdef CONFIG_SUNXI_SPINOR
-	struct sunxi_spi_slave *info = get_sspi();
-#else
-	struct aw_spinand *info = get_spinand();
-#endif
 	int nodeoffset = 0;
 	nodeoffset = fdt_path_offset(working_fdt, "spi0");
 	if (nodeoffset < 0) {
@@ -804,14 +833,55 @@ int sunxi_update_fdt_para_for_kernel(void)
 				fdt_strerror(nodeoffset));
 		return -1;
 	}
-	fdt_setprop_u32(working_fdt, nodeoffset,
-			"sample_mode", info->right_sample_mode);
-	fdt_setprop_u32(working_fdt, nodeoffset,
-			"sample_delay", info->right_sample_delay);
+
+	switch (storage_type) {
+	case STORAGE_NOR:
+#ifdef CONFIG_SUNXI_SPINOR
+	{
+		struct sunxi_spi_slave *sspi = get_sspi();
+		fdt_setprop_u32(working_fdt, nodeoffset,
+				"sample_mode", sspi->right_sample_mode);
+		fdt_setprop_u32(working_fdt, nodeoffset,
+				"sample_delay", sspi->right_sample_delay);
+		pr_msg("spinor update sample_mode:%x right_sample_mod:%x\n",
+				sspi->right_sample_mode,
+				sspi->right_sample_delay);
+	}
+#endif
+		break;
+	case STORAGE_SPI_NAND:
+#ifdef CONFIG_SUNXI_NAND
+	{
+		struct aw_spinand *spinand = get_spinand();
+		fdt_setprop_u32(working_fdt, nodeoffset,
+				"sample_mode", spinand->right_sample_mode);
+		fdt_setprop_u32(working_fdt, nodeoffset,
+				"sample_delay", spinand->right_sample_delay);
+		pr_msg("spinand update sample_mode:%x right_sample_mod:%x\n",
+				spinand->right_sample_mode,
+				spinand->right_sample_delay);
+	}
+#endif
+		break;
+	default:
+		pr_err("The storage not support sample function\n");
+		break;
+	}
+
 #endif
 
 	/* fix dram para */
 	update_fdt_dram_para(working_fdt);
+#ifdef CONFIG_SUNXI_SPINOR_JPEG
+int save_jpg_logo_to_kernel(void);
+	save_jpg_logo_to_kernel();
+#endif
+
+#ifdef CONFIG_SUNXI_SPINOR_BMP
+int save_bmp_logo_to_kernel(void);
+	save_bmp_logo_to_kernel();
+#endif
+
 #ifdef CONFIG_BOOT_GUI
 	save_disp_cmd();
 	disp_update_lcd_param(-1);
@@ -819,6 +889,11 @@ int sunxi_update_fdt_para_for_kernel(void)
 #ifdef CONFIG_SUNXI_MAC
 	extern int update_sunxi_mac(void);
 	update_sunxi_mac();
+#endif
+#if defined(CONFIG_SUN50IW9_AUTOPRINT)
+	if (check_printmode()) {
+		open_autoprint();
+	}
 #endif
 	tick_printf("update dts\n");
 	return 0;
@@ -856,8 +931,13 @@ int sunxi_update_partinfo(void)
 		return -ENODEV;
 
 	for (index = 1;; index++) {
+#if defined (CONFIG_ENABLE_MTD_CMDLINE_PARTS_BY_ENV) /*Get partitiones by env*/
+		extern int sunxi_partition_parse_get_info(int index, disk_partition_t *info);
+		ret = sunxi_partition_parse_get_info(index, &info);
+#else /* Get partitiones by GPT */
 		ret = part_get_info(desc, index, &info);
 		debug("%s: try part %d, ret = %d\n", __func__, index, ret);
+#endif
 		if (ret < 0)
 			break;
 

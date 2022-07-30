@@ -128,7 +128,7 @@ void __udelay(unsigned long usec)
 * 64bit arch timer.CNTPCT
 * Freq = 24000000Hz
 */
-u64 read_timer(void)
+u64 __attribute__((no_instrument_function))  read_timer(void)
 {
 	u32 low=0, high = 0;
 	asm volatile("mrrc p15, 0, %0, %1, c14"
@@ -173,14 +173,21 @@ void __msdelay(unsigned long ms)
 
 
 /* get the current time(ms), freq = 24000000Hz*/
-int runtime_tick(void)
+int  __attribute__((no_instrument_function))  runtime_tick(void)
 {
 	u64 cnt= 0;
 	cnt = read_timer();
 	return lldiv(cnt, 24000);
 }
 
-ulong get_timer_masked(void)
+unsigned long notrace timer_get_us(void)
+{
+	u64 cnt = 0;
+	cnt	= read_timer();
+	return lldiv(cnt, 24);
+}
+
+ulong  __attribute__((no_instrument_function))  get_timer_masked(void)
 {
 	/* current tick value */
 	ulong now = runtime_tick();
@@ -190,7 +197,7 @@ ulong get_timer_masked(void)
 
 /* timer without interrupts */
 /* count the delay by seconds */
-ulong get_timer(ulong base)
+ulong  __attribute__((no_instrument_function))  get_timer(ulong base)
 {
     return get_timer_masked() - base;
 }
@@ -329,7 +336,7 @@ void init_timer(struct timer_list *timer)
     return ;
 }
 
-void add_timer(struct timer_list *timer)
+void  add_timer(struct timer_list *timer)
 {
 	u32 reg_val;
 	int timer_num;

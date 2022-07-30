@@ -48,6 +48,13 @@ config SUNXI_ADVERT_PICTURE
 	help
 		when enable, uboot will try to use logo in reserve0, witch can be modified by APPS
 
+config SUNXI_ANTI_COPY_BOARD
+	bool "sunxi anti copy board"
+	default n
+	select SUNXI_SECURE_STORAGE
+	help
+		when enable, uboot will verify the board.
+
 config SUNXI_VERIFY_DSP
 	bool "sunxi verify dsp"
 	default y
@@ -139,6 +146,12 @@ config SUNXI_NECESSARY_REPLACE_FDT
 	help
 	    Get fdt data from dtb.img, boot.img or vendor_boot.img
 	    to replace current fdt data v2
+
+config SUN50IW9_AUTOPRINT
+	bool "Open print mode check"
+	default n
+	help
+	    check card print and uart print,write auto_print
 
 config SUNXI_LRADC_VOL
 	bool "sunxi support lradc read voltage"
@@ -276,4 +289,15 @@ config SUNXI_FPGA_PLATFORM
 	help
 		fpga board have special treament for resources like
 		clock or io, this config enable thoes special treament
+
+config SUNXI_TRACE
+	bool "enable trace feature"
+	help
+		trace feature based on origin TRACE
+config SUNXI_MEM_INFO
+        bool "sunxi memory info"
+        default y
+        help
+           enable memory information
+
 endmenu

@@ -9,6 +9,7 @@
 #include <asm/io.h>
 #include <asm/arch/ce.h>
 #include <memalign.h>
+#include <sunxi_board.h>
 #include "ss_op.h"
 
 #define ALG_SHA256 (0x13)
@@ -122,6 +123,19 @@ static void __rsa_padding(u8 *dst_buf, u8 *src_buf, u32 data_len, u32 group_len)
 	memset(dst_buf, 0, group_len);
 	for (i = group_len - data_len; i < group_len; i++) {
 		dst_buf[i] = src_buf[group_len - 1 - i];
+	}
+}
+
+static void word_padding(u8 *dst_buf, u8 *src_buf, u32 size_byte)
+{
+	int i = 0;
+	u32 *p_d = (u32 *)dst_buf;
+	u32 *p_s = (u32 *)src_buf;
+	u32 word_size = size_byte >> 2;
+
+	memset(dst_buf, 0, size_byte);
+	for (i = 0; i < word_size; i++) {
+		p_d[i] = p_s[(word_size -1) - i];
 	}
 }
 
@@ -301,7 +315,7 @@ int sunxi_hash_test(u8 *dst_addr, u32 dst_len, u8 *src_addr, u32 src_len, u32 sh
 	return 0;
 }
 
-s32 sunxi_sm2_test(struct sunxi_sm2_ctx_t *sm2_ctx)
+s32 sm2_crypto_gen_cxy_kxy(struct sunxi_sm2_ctx_t *sm2_ctx)
 {
 	task_queue task0 __aligned(CACHE_LINE_SIZE) = { 0 };
 	u32 sm2_size_byte = sm2_ctx->sm2_size >> 3;
@@ -309,57 +323,113 @@ s32 sunxi_sm2_test(struct sunxi_sm2_ctx_t *sm2_ctx)
 	u32 mode = sm2_ctx->mode;
 	u32 align_shift = ss_get_addr_align();
 	int i;
+	int case_size = sm2_size_byte;
+
+	if (case_size < CACHE_LINE_SIZE) {
+		case_size = CACHE_LINE_SIZE;
+	}
+
+	ALLOC_CACHE_ALIGN_BUFFER(u8, p_k, case_size);
+	ALLOC_CACHE_ALIGN_BUFFER(u8, p_p, case_size);
+	ALLOC_CACHE_ALIGN_BUFFER(u8, p_a, case_size);
+	ALLOC_CACHE_ALIGN_BUFFER(u8, p_gx, case_size);
+	ALLOC_CACHE_ALIGN_BUFFER(u8, p_gy, case_size);
+	ALLOC_CACHE_ALIGN_BUFFER(u8, p_px, case_size);
+	ALLOC_CACHE_ALIGN_BUFFER(u8, p_py, case_size);
+	ALLOC_CACHE_ALIGN_BUFFER(u8, p_h, case_size);
+	ALLOC_CACHE_ALIGN_BUFFER(u8, p_cx, case_size);
+	ALLOC_CACHE_ALIGN_BUFFER(u8, p_cy, case_size);
+	ALLOC_CACHE_ALIGN_BUFFER(u8, p_kx, case_size);
+	ALLOC_CACHE_ALIGN_BUFFER(u8, p_ky, case_size);
+	ALLOC_CACHE_ALIGN_BUFFER(u8, p_out, case_size);
+
+	/*big-endian to little-endian*/
+	word_padding(p_k, sm2_ctx->k, sm2_size_byte);
+	word_padding(p_p, sm2_ctx->p, sm2_size_byte);
+	word_padding(p_a, sm2_ctx->a, sm2_size_byte);
+	word_padding(p_gx, sm2_ctx->gx, sm2_size_byte);
+	word_padding(p_gy, sm2_ctx->gy, sm2_size_byte);
+	word_padding(p_h, sm2_ctx->h, sm2_size_byte);
+	word_padding(p_px, sm2_ctx->px, sm2_size_byte);
+	word_padding(p_py, sm2_ctx->py, sm2_size_byte);
+
+	memset(p_cx, 0x00, case_size);
+	memset(p_cy, 0x00, case_size);
+	memset(p_kx, 0x00, case_size);
+	memset(p_ky, 0x00, case_size);
+	memset(p_out, 0x00, case_size);
 
 	memset((void *)&task0, 0x00, sizeof(task0));
-
 	task0.task_id	     = CHANNEL_0;
 	task0.common_ctl     = (ALG_SM2 | (1U << 31));
 	task0.asymmetric_ctl = (sm2_size_word) | (mode << 16);
 
-	task0.source[0].addr = ((ulong)sm2_ctx->k >> align_shift);
-	task0.source[0].length = (sm2_ctx->k_len >> 2);
-	task0.source[1].addr = ((ulong)sm2_ctx->p >> align_shift);
-	task0.source[1].length = sm2_size_word;
-	task0.source[2].addr = ((ulong)sm2_ctx->a >> align_shift);
-	task0.source[2].length = sm2_size_word;
-	task0.source[3].addr = ((ulong)sm2_ctx->gx >> align_shift);
-	task0.source[3].length = sm2_size_word;
-	task0.source[4].addr = ((ulong)sm2_ctx->gy >> align_shift);
-	task0.source[4].length = sm2_size_word;
-	task0.source[5].addr = ((ulong)sm2_ctx->n >> align_shift);
-	task0.source[5].length = sm2_size_word;
-	task0.source[6].addr = ((ulong)sm2_ctx->px >> align_shift);
-	task0.source[6].length = sm2_size_word;
-	task0.source[7].addr = ((ulong)sm2_ctx->py >> align_shift);
-	task0.source[7].length = sm2_size_word;
+	//encrypt
+	if (mode == 0x0) {
+		//k
+		task0.source[0].addr = ((ulong)p_k >> align_shift);
+		task0.source[0].length = (sm2_ctx->k_len >> 2);
+		//p
+		task0.source[1].addr = ((ulong)p_p >> align_shift);
+		task0.source[1].length = sm2_size_word;
+		//a
+		task0.source[2].addr = ((ulong)p_a >> align_shift);
+		task0.source[2].length = sm2_size_word;
+		//gx
+		task0.source[3].addr = ((ulong)p_gx >> align_shift);
+		task0.source[3].length = sm2_size_word;
+		//gy
+		task0.source[4].addr = ((ulong)p_gy >> align_shift);
+		task0.source[4].length = sm2_size_word;
+		//h
+		task0.source[5].addr = ((ulong)p_h >> align_shift);
+		task0.source[5].length = sm2_size_word;
+		//px
+		task0.source[6].addr = ((ulong)p_px >> align_shift);
+		task0.source[6].length = sm2_size_word;
+		//py
+		task0.source[7].addr = ((ulong)p_py >> align_shift);
+		task0.source[7].length = sm2_size_word;
 
-	for (i = 0; i < 8; i++) {
-		task0.data_len += task0.source[i].length;
+		//data_len
+		for (i = 0; i < 8; i++) {
+			task0.data_len += task0.source[i].length;
+		}
+		pr_err("data_len = %d\n", task0.data_len);
+
+		//dest
+		task0.destination[0].addr = ((ulong)p_cx >> align_shift);
+		task0.destination[0].length = sm2_size_word;
+		task0.destination[1].addr = ((ulong)p_cy >> align_shift);
+		task0.destination[1].length = sm2_size_word;
+		task0.destination[2].addr = ((ulong)p_kx >> align_shift);
+		task0.destination[2].length = sm2_size_word;
+		task0.destination[3].addr = ((ulong)p_ky >> align_shift);
+		task0.destination[3].length = sm2_size_word;
+		task0.destination[4].addr = ((ulong)p_out >> align_shift);
+		task0.destination[4].length = sm2_size_word;
+	} else if (mode == 0x1) {	//decrypt
+		//dest
+		task0.destination[0].addr = ((ulong)p_out >> align_shift);
+		task0.destination[0].length = sm2_size_word;
 	}
-	pr_err("data_len = %d\n", task0.data_len);
-
-	task0.destination[0].addr = ((ulong)sm2_ctx->cx >> align_shift);
-	task0.destination[0].length = sm2_size_word;
-	task0.destination[1].addr = ((ulong)sm2_ctx->cy >> align_shift);
-	task0.destination[1].length = sm2_size_word;
-	task0.destination[2].addr = ((ulong)sm2_ctx->kx >> align_shift);
-	task0.destination[2].length = sm2_size_word;
-	task0.destination[3].addr = ((ulong)sm2_ctx->ky >> align_shift);
-	task0.destination[3].length = sm2_size_word;
-	task0.destination[4].addr = ((ulong)sm2_ctx->out >> align_shift);
-	task0.destination[4].length = sm2_size_word;
 
 	flush_cache((ulong)&task0, sizeof(task0));
-	flush_cache((ulong)sm2_ctx->p, sm2_size_byte);
-	flush_cache((ulong)sm2_ctx->a, sm2_size_byte);
-	flush_cache((ulong)sm2_ctx->gx, sm2_size_byte);
-	flush_cache((ulong)sm2_ctx->gy, sm2_size_byte);
-	flush_cache((ulong)sm2_ctx->n, sm2_size_byte);
-	flush_cache((ulong)sm2_ctx->px, sm2_size_byte);
-	flush_cache((ulong)sm2_ctx->py, sm2_size_byte);
+	flush_cache((ulong)p_k, case_size);
+	flush_cache((ulong)p_p, case_size);
+	flush_cache((ulong)p_a, case_size);
+	flush_cache((ulong)p_gx, case_size);
+	flush_cache((ulong)p_gy, case_size);
+	flush_cache((ulong)p_h, case_size);
+	flush_cache((ulong)p_px, case_size);
+	flush_cache((ulong)p_py, case_size);
+	flush_cache((ulong)p_cx, case_size);
+	flush_cache((ulong)p_cy, case_size);
+	flush_cache((ulong)p_kx, case_size);
+	flush_cache((ulong)p_ky, case_size);
+	flush_cache((ulong)p_out, case_size);
 
-
-	ss_set_drq((u32)&task0);
+	ss_set_drq((ulong)&task0);
 	ss_irq_enable(task0.task_id);
 	ss_ctrl_start(ASYM_TRPE);
 	ss_wait_finish(task0.task_id);
@@ -372,16 +442,498 @@ s32 sunxi_sm2_test(struct sunxi_sm2_ctx_t *sm2_ctx)
 		return -1;
 	}
 
-	invalidate_dcache_range((ulong)sm2_ctx->cx,
-				(ulong)sm2_ctx->cx + sm2_size_byte);
-	invalidate_dcache_range((ulong)sm2_ctx->cy,
-				(ulong)sm2_ctx->cy + sm2_size_byte);
-	invalidate_dcache_range((ulong)sm2_ctx->kx,
-				(ulong)sm2_ctx->kx + sm2_size_byte);
-	invalidate_dcache_range((ulong)sm2_ctx->ky,
-				(ulong)sm2_ctx->ky + sm2_size_byte);
-	invalidate_dcache_range((ulong)sm2_ctx->out,
-				(ulong)sm2_ctx->out + sm2_size_byte);
+	invalidate_dcache_range((ulong)p_cx, (ulong)p_cx + case_size);
+	invalidate_dcache_range((ulong)p_cy, (ulong)p_cy + case_size);
+	invalidate_dcache_range((ulong)p_kx, (ulong)p_kx + case_size);
+	invalidate_dcache_range((ulong)p_ky, (ulong)p_ky + case_size);
+	invalidate_dcache_range((ulong)p_out, (ulong)p_out + case_size);
+
+	word_padding(sm2_ctx->cx, p_cx, sm2_size_byte);
+	word_padding(sm2_ctx->cy, p_cy, sm2_size_byte);
+	word_padding(sm2_ctx->kx, p_kx, sm2_size_byte);
+	word_padding(sm2_ctx->ky, p_ky, sm2_size_byte);
+
+	if ((*(ulong *)(p_out)) != 0x0) {
+		pr_err("sm2: calu c1 error\n");
+		return -1;
+	}
+
+	return 0;
+}
+
+s32 sm2_ecdh_gen_key_rx_ry(struct sunxi_sm2_ctx_t *sm2_ctx, int flag)
+{
+	task_queue task0 __aligned(CACHE_LINE_SIZE) = { 0 };
+	u32 sm2_size_byte = sm2_ctx->sm2_size >> 3;
+	u32 sm2_size_word = sm2_ctx->sm2_size >> 5;
+	u32 demod_rax[8] = {0x64CED1BD, 0xBC99D590, 0x049B434D, 0x0FD73428,
+						0xCF608A5D, 0xB8FE5CE0, 0x7F150269, 0x40BAE40E};
+	u32 demod_ray[8] = {0x376629C7, 0xAB21E7DB, 0x26092249, 0x9DDB118F,
+						0x07CE8EAA, 0xE3E7720A, 0xFEF6A5CC, 0x062070C0};
+	u32 demod_rbx[8] = {0xACC27688, 0xA6F7B706, 0x098BC91F, 0xF3AD1BFF,
+						0x7DC2802C, 0xDB14CCCC, 0xDB0A9047, 0x1F9BD707};
+	u32 demod_rby[8] = {0x2FEDAC04, 0x94B2FFC4, 0xD6853876, 0xC79B8F30,
+						0x1C6573AD, 0x0AA50F39, 0xFC87181E, 0x1A1B46FE};
+	int i, ret1, ret2;
+	u32 align_shift = ss_get_addr_align();
+	int cache_size = sm2_size_byte;
+
+	if (sm2_size_byte < CACHE_LINE_SIZE) {
+		cache_size = CACHE_LINE_SIZE;
+	}
+
+	ALLOC_CACHE_ALIGN_BUFFER(u8, p_p, cache_size);
+	ALLOC_CACHE_ALIGN_BUFFER(u8, p_a, cache_size);
+	ALLOC_CACHE_ALIGN_BUFFER(u8, p_ra, cache_size);
+	ALLOC_CACHE_ALIGN_BUFFER(u8, p_gx, cache_size);
+	ALLOC_CACHE_ALIGN_BUFFER(u8, p_gy, cache_size);
+	ALLOC_CACHE_ALIGN_BUFFER(u8, p_rax, cache_size);
+	ALLOC_CACHE_ALIGN_BUFFER(u8, p_ray, cache_size);
+	ALLOC_CACHE_ALIGN_BUFFER(u8, p_rbx, cache_size);
+	ALLOC_CACHE_ALIGN_BUFFER(u8, p_rby, cache_size);
+
+	/*big-endian to little-endian*/
+	word_padding(p_p, sm2_ctx->p, sm2_size_byte);
+	word_padding(p_a, sm2_ctx->a, sm2_size_byte);
+	word_padding(p_gx, sm2_ctx->gx, sm2_size_byte);
+	word_padding(p_gy, sm2_ctx->gy, sm2_size_byte);
+	if (flag == ECDH_USER_A) {
+		word_padding(p_ra, sm2_ctx->ra, sm2_size_byte);
+	} else {
+		word_padding(p_ra, sm2_ctx->rb, sm2_size_byte);
+	}
+
+	memset((void *)&task0, 0x00, sizeof(task0));
+	task0.task_id	     = CHANNEL_0;
+	task0.common_ctl     = (0x21 | (1U << 31));
+	task0.asymmetric_ctl = (sm2_size_word) | (2 << 16);
+
+	//p
+	task0.source[0].addr = ((ulong)p_p >> align_shift);
+	task0.source[0].length = sm2_size_word;
+	//ra
+	task0.source[1].addr = ((ulong)p_ra >> align_shift);
+	task0.source[1].length = sm2_size_word;
+	//a
+	task0.source[2].addr = ((ulong)p_a >> align_shift);
+	task0.source[2].length = sm2_size_word;
+	//gx
+	task0.source[3].addr = ((ulong)p_gx >> align_shift);
+	task0.source[3].length = sm2_size_word;
+	//gy
+	task0.source[4].addr = ((ulong)p_gy >> align_shift);
+	task0.source[4].length = sm2_size_word;
+
+	//data_len
+	for (i = 0; i < 5; i++) {
+		task0.data_len += task0.source[i].length;
+	}
+
+	//dest
+	if (flag == ECDH_USER_A) {
+		task0.destination[0].addr = ((ulong)p_rax >> align_shift);
+		task0.destination[0].length = sm2_size_word;
+		task0.destination[1].addr = ((ulong)p_ray >> align_shift);
+		task0.destination[1].length = sm2_size_word;
+	} else {
+		task0.destination[0].addr = ((ulong)p_rbx >> align_shift);
+		task0.destination[0].length = sm2_size_word;
+		task0.destination[1].addr = ((ulong)p_rby >> align_shift);
+		task0.destination[1].length = sm2_size_word;
+	}
+
+	flush_cache((ulong)&task0, sizeof(task0));
+	flush_cache((ulong)p_p, cache_size);
+	flush_cache((ulong)p_ra, cache_size);
+	flush_cache((ulong)p_a, cache_size);
+	flush_cache((ulong)p_gx, cache_size);
+	flush_cache((ulong)p_gy, cache_size);
+	flush_cache((ulong)p_rax, cache_size);
+	flush_cache((ulong)p_ray, cache_size);
+	flush_cache((ulong)p_rbx, cache_size);
+	flush_cache((ulong)p_rby, cache_size);
+
+	ss_set_drq((ulong)&task0);
+	ss_irq_enable(task0.task_id);
+	ss_ctrl_start(ASYM_TRPE);
+	ss_wait_finish(task0.task_id);
+	ss_pending_clear(task0.task_id);
+	ss_ctrl_stop();
+	ss_irq_disable(task0.task_id);
+	if (ss_check_err(task0.task_id)) {
+		printf("SS %s fail 0x%x\n", __func__,
+		       ss_check_err(task0.task_id));
+		return -1;
+	}
+
+	if (flag == ECDH_USER_A) {
+		invalidate_dcache_range((ulong)p_rax, (ulong)p_rax + cache_size);
+		invalidate_dcache_range((ulong)p_ray, (ulong)p_ray + cache_size);
+		word_padding(sm2_ctx->rax, p_rax, sm2_size_byte);
+		word_padding(sm2_ctx->ray, p_ray, sm2_size_byte);
+		ret1 = memcmp(demod_rax, sm2_ctx->rax, sm2_size_byte);
+		ret2 = memcmp(demod_ray, sm2_ctx->ray, sm2_size_byte);
+		if ((ret1 || ret2)) {
+			pr_err(" compare rax ray fail\n");
+			pr_err("rax(ce)\n");
+			sunxi_dump((u8 *)(IOMEM_ADDR(sm2_ctx->rax)), sm2_size_byte);
+			pr_err("rax(demod)\n");
+			sunxi_dump((u8 *)(IOMEM_ADDR(demod_rax)), sm2_size_byte);
+			pr_err("ray(ce)\n");
+			sunxi_dump((u8 *)(IOMEM_ADDR(sm2_ctx->ray)), sm2_size_byte);
+			pr_err("ray(demod)\n");
+			sunxi_dump((u8 *)(IOMEM_ADDR(demod_ray)), sm2_size_byte);
+			return -1;
+		} else {
+			pr_err(" compare rax ray sucess\n");
+		}
+	} else {
+		invalidate_dcache_range((ulong)p_rbx, (ulong)p_rbx + cache_size);
+		invalidate_dcache_range((ulong)p_rby, (ulong)p_rby + cache_size);
+		word_padding(sm2_ctx->rbx, p_rbx, sm2_size_byte);
+		word_padding(sm2_ctx->rby, p_rby, sm2_size_byte);
+		ret1 = memcmp(demod_rbx, sm2_ctx->rbx, sm2_size_byte);
+		ret2 = memcmp(demod_rby, sm2_ctx->rby, sm2_size_byte);
+		if ((ret1 || ret2)) {
+			pr_err(" compare rbx ray fail\n");
+			pr_err("rbx(ce)\n");
+			sunxi_dump((u8 *)(IOMEM_ADDR(sm2_ctx->rbx)), sm2_size_byte);
+			pr_err("rbx(demod)\n");
+			sunxi_dump((u8 *)(IOMEM_ADDR(demod_rbx)), sm2_size_byte);
+			pr_err("rby(ce)\n");
+			sunxi_dump((u8 *)(IOMEM_ADDR(sm2_ctx->rby)), sm2_size_byte);
+			pr_err("rby(demod)\n");
+			sunxi_dump((u8 *)(IOMEM_ADDR(demod_rby)), sm2_size_byte);
+			return -1;
+		} else {
+			pr_err(" compare rbx rby sucess\n");
+		}
+	}
+
+	return 0;
+}
+
+s32 sm2_ecdh_gen_ux_uy(struct sunxi_sm2_ctx_t *sm2_ctx)
+{
+	task_queue task0 __aligned(CACHE_LINE_SIZE) = { 0 };
+	u32 sm2_size_byte = sm2_ctx->sm2_size >> 3;
+	u32 sm2_size_word = sm2_ctx->sm2_size >> 5;
+	u32 mode = sm2_ctx->mode;
+	u32 align_shift = ss_get_addr_align();
+	u8 *p_data = NULL;
+	int cache_size = sm2_size_byte;
+
+	if (sm2_size_byte < CACHE_LINE_SIZE) {
+		cache_size = CACHE_LINE_SIZE;
+	}
+
+	ALLOC_CACHE_ALIGN_BUFFER(u8, data, (12* sm2_size_byte));
+	ALLOC_CACHE_ALIGN_BUFFER(u8, p_n, cache_size);
+	ALLOC_CACHE_ALIGN_BUFFER(u8, p_h, cache_size);
+	ALLOC_CACHE_ALIGN_BUFFER(u8, p_p, cache_size);
+	ALLOC_CACHE_ALIGN_BUFFER(u8, p_a, cache_size);
+	ALLOC_CACHE_ALIGN_BUFFER(u8, p_ra, cache_size);
+	ALLOC_CACHE_ALIGN_BUFFER(u8, p_b, cache_size);
+	ALLOC_CACHE_ALIGN_BUFFER(u8, p_da, cache_size);
+	ALLOC_CACHE_ALIGN_BUFFER(u8, p_pxb, cache_size);
+	ALLOC_CACHE_ALIGN_BUFFER(u8, p_pyb, cache_size);
+	ALLOC_CACHE_ALIGN_BUFFER(u8, p_rax, cache_size);
+	ALLOC_CACHE_ALIGN_BUFFER(u8, p_rbx, cache_size);
+	ALLOC_CACHE_ALIGN_BUFFER(u8, p_rby, cache_size);
+	ALLOC_CACHE_ALIGN_BUFFER(u8, p_ux, cache_size);
+	ALLOC_CACHE_ALIGN_BUFFER(u8, p_uy, cache_size);
+	ALLOC_CACHE_ALIGN_BUFFER(u8, p_out, cache_size);
+
+	//-3-gen xu ||yu
+	/*big-endian to little-endian*/
+	word_padding(p_n, sm2_ctx->n, sm2_size_byte);
+	word_padding(p_rax, sm2_ctx->rax, sm2_size_byte);
+	word_padding(p_ra, sm2_ctx->ra, sm2_size_byte);
+	word_padding(p_da, sm2_ctx->da, sm2_size_byte);
+	word_padding(p_h, sm2_ctx->h, sm2_size_byte);
+	word_padding(p_p, sm2_ctx->p, sm2_size_byte);
+	word_padding(p_a, sm2_ctx->a, sm2_size_byte);
+	word_padding(p_rbx, sm2_ctx->rbx, sm2_size_byte);
+	word_padding(p_rby, sm2_ctx->rby, sm2_size_byte);
+	word_padding(p_b, sm2_ctx->b, sm2_size_byte);
+	word_padding(p_pxb, sm2_ctx->pxb, sm2_size_byte);
+	word_padding(p_pyb, sm2_ctx->pyb, sm2_size_byte);
+
+	memset((void *)&task0, 0x00, sizeof(task0));
+	task0.task_id	     = CHANNEL_0;
+	task0.common_ctl     = (ALG_SM2 | (1U << 31));
+	task0.asymmetric_ctl = (sm2_size_word) | (mode << 16);
+
+	memset((void *)data, 0x00, sizeof(data));
+	p_data = data;
+	//n
+	memcpy(p_data, p_n, sm2_size_byte);
+	p_data += sm2_size_byte;
+	//rax
+	memcpy(p_data, p_rax, sm2_size_byte);
+	p_data += sm2_size_byte;
+	//ra
+	memcpy(p_data, p_ra, sm2_size_byte);
+	p_data += sm2_size_byte;
+	//da
+	memcpy(p_data, p_da, sm2_size_byte);
+	p_data += sm2_size_byte;
+	//h
+	memcpy(p_data, p_h, sm2_size_byte);
+	p_data += sm2_size_byte;
+	//p
+	memcpy(p_data, p_p, sm2_size_byte);
+	p_data += sm2_size_byte;
+	//a
+	memcpy(p_data, p_a, sm2_size_byte);
+	p_data += sm2_size_byte;
+	//rbx
+	memcpy(p_data, p_rbx, sm2_size_byte);
+	p_data += sm2_size_byte;
+	//rby
+	memcpy(p_data, p_rby, sm2_size_byte);
+	p_data += sm2_size_byte;
+	//b
+	memcpy(p_data, p_b, sm2_size_byte);
+	p_data += sm2_size_byte;
+	//pxb
+	memcpy(p_data, p_pxb, sm2_size_byte);
+	p_data += sm2_size_byte;
+	//pyb
+	memcpy(p_data, p_pyb, sm2_size_byte);
+	p_data += sm2_size_byte;
+
+	//source
+	task0.source[0].addr = ((ulong)data >> align_shift);
+	task0.source[0].length = 12 * sm2_size_word;
+
+	//data_len
+	task0.data_len = 12 * sm2_size_word;
+
+	//dest
+	task0.destination[0].addr = ((ulong)p_ux >> align_shift);
+	task0.destination[0].length = sm2_size_word;
+	task0.destination[1].addr = ((ulong)p_uy >> align_shift);
+	task0.destination[1].length = sm2_size_word;
+	task0.destination[2].addr = ((ulong)p_out >> align_shift);
+	task0.destination[2].length = sm2_size_word;
+
+	flush_cache((ulong)data, task0.data_len);
+	flush_cache((ulong)p_ux, cache_size);
+	flush_cache((ulong)p_uy, cache_size);
+	flush_cache((ulong)p_out, cache_size);
+
+	ss_set_drq((ulong)&task0);
+	ss_irq_enable(task0.task_id);
+	ss_ctrl_start(ASYM_TRPE);
+	ss_wait_finish(task0.task_id);
+	ss_pending_clear(task0.task_id);
+	ss_ctrl_stop();
+	ss_irq_disable(task0.task_id);
+	if (ss_check_err(task0.task_id)) {
+		printf("SS %s fail 0x%x\n", __func__,
+		       ss_check_err(task0.task_id));
+		return -1;
+	}
+
+	invalidate_dcache_range((ulong)p_ux, (ulong)p_ux + cache_size);
+	invalidate_dcache_range((ulong)p_uy, (ulong)p_uy + cache_size);
+	invalidate_dcache_range((ulong)p_out, (ulong)p_out + cache_size);
+
+	if ((*(u32 *)(p_out)) != 1) {
+		pr_err("%s fail\n", __func__);
+		return -1;
+	}
+
+	return 0;
+}
+
+
+s32 sunxi_sm2_sign_verify_test(struct sunxi_sm2_ctx_t *sm2_ctx)
+{
+	task_queue task0 __aligned(CACHE_LINE_SIZE) = { 0 };
+	u32 sm2_size_byte = sm2_ctx->sm2_size >> 3;
+	u32 sm2_size_word = sm2_ctx->sm2_size >> 5;
+	u32 mode = sm2_ctx->mode;
+	u32 align_shift = ss_get_addr_align();
+	int i;
+	u8 *p_data = NULL;
+	int case_size = sm2_size_byte;
+
+	if (case_size < CACHE_LINE_SIZE) {
+		case_size = CACHE_LINE_SIZE;
+	}
+
+	ALLOC_CACHE_ALIGN_BUFFER(u8, data, 512);
+	ALLOC_CACHE_ALIGN_BUFFER(u8, p_k, case_size);
+	ALLOC_CACHE_ALIGN_BUFFER(u8, p_p, case_size);
+	ALLOC_CACHE_ALIGN_BUFFER(u8, p_a, case_size);
+	ALLOC_CACHE_ALIGN_BUFFER(u8, p_gx, case_size);
+	ALLOC_CACHE_ALIGN_BUFFER(u8, p_gy, case_size);
+	ALLOC_CACHE_ALIGN_BUFFER(u8, p_e, case_size);
+	ALLOC_CACHE_ALIGN_BUFFER(u8, p_n, case_size);
+	ALLOC_CACHE_ALIGN_BUFFER(u8, p_px, case_size);
+	ALLOC_CACHE_ALIGN_BUFFER(u8, p_py, case_size);
+	ALLOC_CACHE_ALIGN_BUFFER(u8, p_d, case_size);
+	ALLOC_CACHE_ALIGN_BUFFER(u8, p_r, case_size);
+	ALLOC_CACHE_ALIGN_BUFFER(u8, p_s, case_size);
+	ALLOC_CACHE_ALIGN_BUFFER(u8, p_out, case_size);
+
+	memset(p_r, 0x0, case_size);
+	memset(p_s, 0x0, case_size);
+	memset(p_out, 0x0, case_size);
+	/*big-endian to little-endian*/
+	word_padding(p_k, sm2_ctx->k, sm2_size_byte);
+	word_padding(p_p, sm2_ctx->p, sm2_size_byte);
+	word_padding(p_a, sm2_ctx->a, sm2_size_byte);
+	word_padding(p_gx, sm2_ctx->gx, sm2_size_byte);
+	word_padding(p_gy, sm2_ctx->gy, sm2_size_byte);
+	word_padding(p_n, sm2_ctx->n, sm2_size_byte);
+	word_padding(p_px, sm2_ctx->px, sm2_size_byte);
+	word_padding(p_py, sm2_ctx->py, sm2_size_byte);
+	word_padding(p_d, sm2_ctx->d, sm2_size_byte);
+	word_padding(p_e, sm2_ctx->e, sm2_size_byte);
+	word_padding(p_r, sm2_ctx->r, sm2_size_byte);
+	word_padding(p_s, sm2_ctx->s, sm2_size_byte);
+
+	memset((void *)&task0, 0x00, sizeof(task0));
+	task0.task_id	     = CHANNEL_0;
+	task0.common_ctl     = (ALG_SM2 | (1U << 31));
+	task0.asymmetric_ctl = (sm2_size_word) | (mode << 16);
+
+	//signature
+	if (mode == 0x2) {
+		//k
+		task0.source[0].addr = ((ulong)p_k >> align_shift);
+		task0.source[0].length = (sm2_ctx->k_len >> 2);
+		//p
+		task0.source[1].addr = ((ulong)p_p >> align_shift);
+		task0.source[1].length = sm2_size_word;
+		//a
+		task0.source[2].addr = ((ulong)p_a >> align_shift);
+		task0.source[2].length = sm2_size_word;
+		//gx
+		task0.source[3].addr = ((ulong)p_gx >> align_shift);
+		task0.source[3].length = sm2_size_word;
+		//gy
+		task0.source[4].addr = ((ulong)p_gy >> align_shift);
+		task0.source[4].length = sm2_size_word;
+		//e
+		task0.source[5].addr = ((ulong)p_e >> align_shift);
+		task0.source[5].length = sm2_size_word;
+		//n
+		task0.source[6].addr = ((ulong)p_n >> align_shift);
+		task0.source[6].length = sm2_size_word;
+		//d
+		task0.source[7].addr = ((ulong)p_d >> align_shift);
+		task0.source[7].length = sm2_size_word;
+
+		//data_len
+		for (i = 0; i < 8; i++) {
+			task0.data_len += task0.source[i].length;
+		}
+
+		//dest
+		task0.destination[0].addr = ((ulong)p_r >> align_shift);
+		task0.destination[0].length = sm2_size_word;
+		task0.destination[1].addr = ((ulong)p_s >> align_shift);
+		task0.destination[1].length = sm2_size_word;
+		task0.destination[2].addr = ((ulong)p_out >> align_shift);
+		task0.destination[2].length = sm2_size_word;
+
+		flush_cache((ulong)p_k, case_size);
+		flush_cache((ulong)p_p, case_size);
+		flush_cache((ulong)p_a, case_size);
+		flush_cache((ulong)p_gx, case_size);
+		flush_cache((ulong)p_gy, case_size);
+		flush_cache((ulong)p_n, case_size);
+		flush_cache((ulong)p_e, case_size);
+		flush_cache((ulong)p_d, case_size);
+		flush_cache((ulong)p_r, case_size);
+		flush_cache((ulong)p_s, case_size);
+		flush_cache((ulong)p_out, case_size);
+	} else if (mode == 0x3) {	//verify
+		memset(data, 0x0, sizeof(data));
+		p_data = data;
+		//n
+		memcpy(p_data, p_n, sm2_size_byte);
+		p_data += sm2_size_byte;
+		//r
+		memcpy(p_data, p_r, sm2_size_byte);
+		p_data += sm2_size_byte;
+		//s
+		memcpy(p_data, p_s, sm2_size_byte);
+		p_data += sm2_size_byte;
+		//a
+		memcpy(p_data, p_a, sm2_size_byte);
+		p_data += sm2_size_byte;
+		//gx
+		memcpy(p_data, p_gx, sm2_size_byte);
+		p_data += sm2_size_byte;
+		//gy
+		memcpy(p_data, p_gy, sm2_size_byte);
+		p_data += sm2_size_byte;
+		//p
+		memcpy(p_data, p_p, sm2_size_byte);
+		p_data += sm2_size_byte;
+		//px
+		memcpy(p_data, p_px, sm2_size_byte);
+		p_data += sm2_size_byte;
+		//py
+		memcpy(p_data, p_py, sm2_size_byte);
+		p_data += sm2_size_byte;
+		//n
+		memcpy(p_data, p_n, sm2_size_byte);
+		p_data += sm2_size_byte;
+		//e
+		memcpy(p_data, p_e, sm2_size_byte);
+		p_data += sm2_size_byte;
+		//r
+		memcpy(p_data, p_r, sm2_size_byte);
+		p_data += sm2_size_byte;
+
+		//source
+		task0.source[0].addr = ((ulong)data >> align_shift);
+		task0.source[0].length = 12 * sm2_size_word;
+
+		//data_len
+		task0.data_len = 12 * sm2_size_word;
+
+		//dest
+		task0.destination[0].addr = ((ulong)p_out >> align_shift);
+		task0.destination[0].length = sm2_size_word;
+
+		flush_cache((ulong)p_out, case_size);
+		flush_cache((ulong)data, task0.data_len);
+	}
+
+	flush_cache((ulong)&task0, sizeof(task0));
+
+	ss_set_drq((ulong)&task0);
+	ss_irq_enable(task0.task_id);
+	ss_ctrl_start(ASYM_TRPE);
+	ss_wait_finish(task0.task_id);
+	ss_pending_clear(task0.task_id);
+	ss_ctrl_stop();
+	ss_irq_disable(task0.task_id);
+	if (ss_check_err(task0.task_id)) {
+		printf("SS %s fail 0x%x\n", __func__,
+		       ss_check_err(task0.task_id));
+		return -1;
+	}
+
+	if (mode == 0x2) {
+		invalidate_dcache_range((ulong)p_r, (ulong)p_r + case_size);
+		invalidate_dcache_range((ulong)p_s, (ulong)p_s + case_size);
+		word_padding(sm2_ctx->r, p_r, sm2_size_byte);
+		word_padding(sm2_ctx->s, p_s, sm2_size_byte);
+	} else {
+		invalidate_dcache_range((ulong)p_out, (ulong)p_out + case_size);
+		if ((*(ulong *)(p_out)) != 2) {
+			pr_err("signature verify fail");
+			return -1;
+		}
+	}
 
 	return 0;
 }
@@ -776,6 +1328,53 @@ int sunxi_hash_final(u8 *dst_addr, u8 *src_addr, u32 src_len, u32 total_len)
 	return 0;
 }
 #endif
+
+int sunxi_do_aes_crypt(struct aes_crypt_info_t *aes_info)
+{
+	int ret;
+	u8 enc_flag;
+	u8 aes_moe;
+	u8 key_type;
+	u8 key_size;
+	u32 c_ctl = 0;
+	u32 s_ctl = 0;
+
+	if (aes_info->enc_flag == AES_ENCRYPT) {
+		enc_flag = SS_DIR_ENCRYPT;
+	} else {
+		enc_flag = SS_DIR_DECRYPT;
+	}
+
+	if (aes_info->aes_mode == AES_MODE_ECB) {
+		aes_moe = SS_AES_MODE_ECB;
+	} else if (aes_info->aes_mode == SS_AES_MODE_CBC) {
+		aes_moe = SS_AES_MODE_CBC;
+	} else {
+		pr_err("can't support aes mode\n");
+		return -1;
+	}
+
+	if (aes_info->key_type == KEY_TYPE_SSK) {
+		key_type = SS_KEY_SELECT_SSK;
+		key_size = SS_AES_KEY_256BIT;
+	} else {
+		pr_err("can't support key type\n");
+		return -2;
+	}
+
+	c_ctl = (enc_flag << 8);
+	s_ctl = ((key_size << 0) | (aes_moe << 8) | (key_type << 20));
+	ret = sunxi_aes_with_hardware((u8 *)IOMEM_ADDR(aes_info->dst_buf),
+									(u8 *)IOMEM_ADDR(aes_info->src_buf),
+									aes_info->src_len,
+									NULL, 0, s_ctl, c_ctl);
+	if (ret) {
+		pr_err("sunxi_aes_with_hardware fail\n");
+		return -3;
+	}
+
+	return 0;
+}
 
 #ifdef SUNXI_HASH_TEST
 int do_sha256_test(cmd_tbl_t *cmdtp, int flag, int argc, char *const argv[])

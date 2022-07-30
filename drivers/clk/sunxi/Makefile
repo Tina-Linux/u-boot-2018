@@ -13,6 +13,7 @@ obj-$(CONFIG_MACH_SUN8IW17) += clk-sun8iw17.o
 obj-$(CONFIG_MACH_SUN8IW18) += clk-sun8iw18.o
 obj-$(CONFIG_MACH_SUN8IW19) += clk-sun8iw19.o
 obj-$(CONFIG_MACH_SUN8IW20) += clk-sun8iw20.o
+obj-$(CONFIG_MACH_SUN8IW21) += clk-sun8iw21.o
 obj-$(CONFIG_MACH_SUN50IW1) += clk_sun50iw1.o
 obj-$(CONFIG_MACH_SUN50IW2) += clk-sun50iw2.o
 obj-$(CONFIG_MACH_SUN50IW3) += clk-sun50iw3.o

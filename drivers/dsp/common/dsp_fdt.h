@@ -25,4 +25,5 @@ int dts_uart_msg(struct dts_msg_t *pmsg, u32 dsp_id);
 int dts_dsp_status(struct dts_msg_t *pmsg, u32 dsp_id);
 int dts_gpio_int_msg(struct dts_msg_t *pmsg, u32 dsp_id);
 int dts_sharespace_msg(struct dts_msg_t *pmsg, u32 dsp_id);
+int dts_get_dsp_memory(ulong *start, u32 *size, u32 dsp_id);
 #endif

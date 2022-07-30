@@ -195,6 +195,40 @@ int android_image_get_kernel(const struct andr_img_hdr *hdr, int verify,
 	 * string is null terminated so we take care of this.
 	 */
 #ifdef CONFIG_SUNXI_ANDROID_OVERLAY
+	char *dtboidx = env_get("dtbo_idx");
+	/* if env set dtbo_idx, replace image dtbo_idx, and update cmdline. */
+	/*
+	 * |...            dtbo_idx=${old_value} ...|
+	 * v                        v           v
+	 * |...                     idx         p ...|
+	 */
+	static char image_cmdline[512] = {0};
+	if (dtboidx != NULL) {
+		char *p = NULL;
+		int idx = 0;
+
+		strncpy(image_cmdline, img_cmdline, strlen(img_cmdline));
+		p = img_cmdline;
+		do {
+			if (!strncmp(p, ANDR_BOOT_DTBO_MAIGC, strlen(ANDR_BOOT_DTBO_MAIGC))) {
+				p += strlen(ANDR_BOOT_DTBO_MAIGC);
+				if (*p++ == '=') {
+					idx = p - img_cmdline;
+					while (*p != '\0' && *p != ' ')
+						p++;
+					break;
+				}
+			}
+			while (*p++ != ' ')
+				;
+		} while (*p != '\0' && idx == 0);
+		if (idx != 0) {
+			image_cmdline[idx] = '\0';
+			strcat(image_cmdline, dtboidx);
+			strcat(image_cmdline, p);
+		}
+		img_cmdline = image_cmdline;
+	}
 	get_andriod_dtbo_idx(img_cmdline, ANDR_BOOT_DTBO_MAIGC);
 #endif
 	strncpy(andr_tmp_str, name, ANDR_BOOT_NAME_SIZE);

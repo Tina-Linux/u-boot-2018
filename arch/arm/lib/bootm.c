@@ -358,9 +358,9 @@ static void boot_jump_linux(bootm_headers_t *images, int flag)
 			}
 		}
 #endif
-		memcpy((void*)r2, images->ft_addr, images->ft_len);
-	}
-	else
+		sunxi_mem_info("fdt", (void *)r2, images->ft_len);
+		memcpy((void *)r2, images->ft_addr, images->ft_len);
+	} else
 		r2 = gd->bd->bi_boot_params;
 	debug("## Linux machid: %08lx, FDT addr: %08lx\n", machid, r2);
 #ifdef CONFIG_SUNXI_INITRD_ROUTINE

@@ -61,13 +61,15 @@ extern __u32 get_storage_type(void);
 extern  int rawnand_is_blank(void);
 extern void nand_common1_show_version(void);
 extern int get_boot_work_mode(void);
-#if defined(CONFIG_MACH_SUN8IW18) || defined(CONFIG_MACH_SUN8IW7)
+#if defined(CONFIG_MACH_SUN8IW7) || defined(CONFIG_MACH_SUN8IW18) \
+	|| (defined(CONFIG_SUNXI_RTOS) && (defined(CONFIG_MACH_SUN8IW20) || defined(CONFIG_MACH_SUN20IW1)))
 	extern __u32 NAND_GetPageSize(void);
 #endif
 
 extern int get_boot_work_mode(void);
 
-#if defined(CONFIG_MACH_SUN8IW7) || defined(CONFIG_MACH_SUN8IW18)
+#if defined(CONFIG_MACH_SUN8IW7) || defined(CONFIG_MACH_SUN8IW18) \
+	|| (defined(CONFIG_SUNXI_RTOS) && (defined(CONFIG_MACH_SUN8IW20) || defined(CONFIG_MACH_SUN20IW1)))
 int nand_info_init(struct _nand_info *nand_info, uchar chip, uint16 start_block, uchar *mbr_data);
 #else
 extern int nand_info_init(struct _nand_info *nand_info, int state);
@@ -181,10 +183,11 @@ int NAND_LogicInit(int boot_mode)
 	}
 	nandphy_had_init = true;
 
-#if defined(CONFIG_MACH_SUN8IW7) || defined(CONFIG_MACH_SUN8IW18)
+#if defined(CONFIG_MACH_SUN8IW7) || defined(CONFIG_MACH_SUN8IW18) \
+	|| (defined(CONFIG_SUNXI_RTOS) && (defined(CONFIG_MACH_SUN8IW20) || defined(CONFIG_MACH_SUN20IW1)))
 	boot_mode = get_boot_work_mode();
 	if ((boot_mode != WORK_MODE_BOOT) && (nand_mbr.PartCount != 0) && (mbr_burned_flag == 0)) {
-		NAND_Print("burn nand partition table! mbr tbl: 0x%x, part_count:%d\n", (__u32)(&nand_mbr), nand_mbr.PartCount);
+		NAND_Print("burn nand partition table! mbr tbl: 0x%x, part_count:%d\n", (__u32)(unsigned long)(&nand_mbr), nand_mbr.PartCount);
 		result = nand_info_init(nand_info, 0, 8, (uchar *)&nand_mbr);
 		mbr_burned_flag = 1;
 	} else {
@@ -611,7 +614,8 @@ int NAND_GetParam_store(void *buffer, uint length)
 
 int NAND_FlushCache(void)
 {
-#if defined(CONFIG_MACH_SUN8IW18) || defined(CONFIG_MACH_SUN8IW7)
+#if defined(CONFIG_MACH_SUN8IW18) || defined(CONFIG_MACH_SUN8IW7) \
+	|| (defined(CONFIG_SUNXI_RTOS) && (defined(CONFIG_MACH_SUN8IW20) || defined(CONFIG_MACH_SUN20IW1)))
 	unsigned int pagesize = NAND_GetPageSize();
 #else
 	unsigned int pagesize = nand_get_chip_page_size(BYTE);

@@ -114,9 +114,17 @@
 #define SS_DIR_ENCRYPT	    0
 #define SS_DIR_DECRYPT	    1
 #define SS_KEY_SELECT_INPUT (0)
+
+#ifdef CONFIG_MACH_SUN8IW21
+#define SS_KEY_SELECT_HUK	(4)
+#define SS_KEY_SELECT_SSK	(5)
+#define SS_KEY_SELECT_SSK1	(6)
+#else
 #define SS_KEY_SELECT_SSK   (1)
 #define SS_KEY_SELECT_HUK   (2)
+#endif
 #define SS_KEY_SELECT_RSSK  (3)
+
 
 #define SS_AES_MODE_ECB	   (0)
 #define SS_AES_MODE_CBC	   (1)

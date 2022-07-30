@@ -23,6 +23,7 @@
 #include <sunxi_board.h>
 #include <android_image.h>
 #include <fdt_support.h>
+#include <sunxi_eink.h>
 
 DECLARE_GLOBAL_DATA_PTR;
 
@@ -113,7 +114,10 @@ __maybe_unused static void sunxi_update_initrd(ulong os_load_addr)
 		}
 		memmove_wd((void *)ramdisk_addr, (void *)initrd_start, initrd_size, CHUNKSZ);
 	}
-	env_set_hex("ramdisk_sum", sunxi_generate_checksum((void *)ramdisk_addr, initrd_size, 8, STAMP_VALUE));
+	sunxi_mem_info("ramdisk", (void *)ramdisk_addr, initrd_size);
+	env_set_hex("ramdisk_sum",
+		    sunxi_generate_checksum((void *)ramdisk_addr, initrd_size,
+					    8, STAMP_VALUE));
 	debug("   Loading Ramdisk from %08lx to %08lx, size %08lx ... ",
 		initrd_start, ramdisk_addr, initrd_size);
 #ifdef CONFIG_MP
@@ -199,6 +203,9 @@ int sunxi_get_lcd_op_finished(void);
 int do_bootm(cmd_tbl_t *cmdtp, int flag, int argc, char * const argv[])
 {
 	ulong os_load_addr = simple_strtoul(argv[1], NULL, 16);
+	int fake_go = 0;
+	if (env_get("fake_go"))
+		fake_go = BOOTM_STATE_OS_FAKE_GO;
 
 #ifdef CONFIG_NEEDS_MANUAL_RELOC
 	static int relocated = 0;
@@ -261,11 +268,17 @@ int do_bootm(cmd_tbl_t *cmdtp, int flag, int argc, char * const argv[])
 
 #endif /*CONFIG_SUNXI_ANDROID_BOOT*/
 
-#ifdef CONFIG_DISP2_SUNXI
+#if defined(CONFIG_EINK200_SUNXI)
+	struct eink_fb_info_t *p_inst = eink_get_fb_inst();
+	if (p_inst) {
+		p_inst->wait_pipe_finish(p_inst);
+	}
+#elif defined(CONFIG_DISP2_SUNXI)
 	while (!sunxi_get_lcd_op_finished()) {
 		mdelay(10);
 	}
 #endif
+
 #if CONFIG_SUNXI_INITRD_ROUTINE
 	sunxi_update_initrd(os_load_addr);
 #endif
@@ -303,7 +316,7 @@ int do_bootm(cmd_tbl_t *cmdtp, int flag, int argc, char * const argv[])
 #if defined(CONFIG_PPC) || defined(CONFIG_MIPS)
 		BOOTM_STATE_OS_CMDLINE |
 #endif
-		BOOTM_STATE_OS_PREP | BOOTM_STATE_OS_FAKE_GO |
+		BOOTM_STATE_OS_PREP | fake_go |
 		BOOTM_STATE_OS_GO, &images, 1);
 }
 

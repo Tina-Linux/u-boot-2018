@@ -156,8 +156,10 @@ obj-$(CONFIG_CMD_BLOB) += blob.o
 
 # sunxi
 obj-$(CONFIG_CMD_SUNXI_TIMER) += sunxi_timer.o
+obj-$(CONFIG_CMD_SUNXI_CLK) += sunxi_clk.o
 obj-$(CONFIG_CMD_SUNXI_SPRITE) += sunxi_sprite.o
 obj-$(CONFIG_CMD_SUNXI_FLASH) += sunxi_flash.o
+obj-$(CONFIG_SUNXI_RTOS) += sunxi_rtos.o
 obj-$(CONFIG_CMD_SUNXI_DMA) += sunxi_dma.o
 obj-$(CONFIG_CMD_SUNXI_EFEX) += sunxi_efex.o
 obj-$(CONFIG_CMD_SUNXI_NAND) += sunxi_nand.o
@@ -173,6 +175,8 @@ obj-$(CONFIG_CMD_PWM_LED) += cmd_pwm_led.o
 obj-$(CONFIG_CMD_SUNXI_MEMTEST) += sunxi_memtest.o ./memtest/mem_tests.o
 
 obj-$(CONFIG_CMD_SUNXI_CE_TEST) += sunxi_ce_test.o
+
+obj-$(CONFIG_CMD_SUNXI_SYSRECOVERY_TEST) += sunxi_sysrecovery_test.o
 
 obj-$(CONFIG_X86) += x86/
 endif # !CONFIG_SPL_BUILD
@@ -220,3 +224,5 @@ $(obj)/license_data_size.h: $(srctree)/Licenses/gpl-2.0.txt FORCE
 	$(call filechk,data_size)
 
 CFLAGS_ethsw.o := -Wno-enum-conversion
+
+subdir-ccflags-$(CONFIG_SUNXI_TRACE) += -finstrument-functions

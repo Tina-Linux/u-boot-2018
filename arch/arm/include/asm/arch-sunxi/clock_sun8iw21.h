@@ -302,4 +302,13 @@ struct sunxi_ccm_reg {
 #define CE_MBUS_GATING_BIT		  (2)
 #define CE_MBUS_GATING			  (1)
 
+#define FORCE_DETECTER_OUTPUT		  (1 << 7)
+#define VCCIO_THRESHOLD_VOLTAGE_2_5	  (0 << 4)
+#define VCCIO_THRESHOLD_VOLTAGE_2_6	  (1 << 4)
+#define VCCIO_THRESHOLD_VOLTAGE_2_7	  (2 << 4)
+#define VCCIO_THRESHOLD_VOLTAGE_2_8	  (3 << 4)
+#define VCCIO_THRESHOLD_VOLTAGE_2_9	  (4 << 4)
+#define VCCIO_THRESHOLD_VOLTAGE_3_0	  (5 << 4)
+#define VCCIO_DET_BYPASS_EN		  (1 << 0)
+void rtc_set_vccio_det_spare(void);
 #endif /* _SUNXI_CLOCK_SUN8IW20_H */

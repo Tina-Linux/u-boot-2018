@@ -62,7 +62,7 @@ void timer_exit(void)
 * 64bit arch timer.CNTPCT
 * Freq = 24000000Hz
 */
-static inline u64 read_timer(void)
+static inline u64 notrace read_timer(void)
 {
 	u64 cnt = 0;
 	asm volatile("rdtime %0\n"
@@ -106,6 +106,13 @@ int runtime_tick(void)
 	u64 cnt = 0;
 	cnt = read_timer();
 	return lldiv(cnt, 24000);
+}
+
+unsigned long notrace timer_get_us(void)
+{
+	u64 cnt = 0;
+	cnt	= read_timer();
+	return lldiv(cnt, 24);
 }
 
 ulong get_timer_masked(void)

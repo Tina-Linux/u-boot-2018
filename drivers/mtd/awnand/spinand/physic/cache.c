@@ -52,17 +52,24 @@ static int aw_spinand_cache_copy_to_cache(struct aw_spinand_chip *chip,
 
 	memset(cache->oobbuf, 0xFF, cache->oob_maxlen);
 	if (req->oobbuf && req->ooblen) {
-		int ret;
-		struct aw_spinand_ecc *ecc = chip->ecc;
-		struct aw_spinand_info *info = chip->info;
-		struct aw_spinand_phy_info *pinfo = info->phy_info;
+		if (req->mode != AW_SPINAND_MTD_OPS_RAW) {
+			int ret;
+			struct aw_spinand_ecc *ecc = chip->ecc;
+			struct aw_spinand_info *info = chip->info;
+			struct aw_spinand_phy_info *pinfo = info->phy_info;
 
-		len = min3(req->ooblen, cache->oob_maxlen,
-				(unsigned int)AW_OOB_SIZE_PER_PHY_PAGE);
-		ret = ecc->copy_to_oob(pinfo->EccProtectedType,
-				cache->oobbuf, req->oobbuf, len);
-		if (unlikely(ret))
-			return ret;
+			len = min3(req->ooblen, cache->oob_maxlen,
+					(unsigned int)AW_OOB_SIZE_PER_PHY_PAGE);
+			ret = ecc->copy_to_oob(pinfo->EccProtectedType,
+					cache->oobbuf, req->oobbuf, len);
+			if (unlikely(ret))
+				return ret;
+		} else {
+			len = min3(req->ooblen, cache->oob_maxlen,
+					(unsigned int)AW_OOB_SIZE_PER_PHY_PAGE);
+			memcpy(cache->oobbuf, req->oobbuf, len);
+
+		}
 	}
 
 	/* we must update cache information when update cache buffer */
@@ -85,26 +92,24 @@ static int aw_spinand_cache_copy_from_cache(struct aw_spinand_chip *chip,
 	}
 
 	if (req->oobbuf && req->ooblen) {
-		int ret;
-		struct aw_spinand_ecc *ecc = chip->ecc;
-		struct aw_spinand_info *info = chip->info;
-		struct aw_spinand_phy_info *pinfo = info->phy_info;
-		unsigned char *oobtmp;
+		if (req->mode != AW_SPINAND_MTD_OPS_RAW) {
+			int ret;
+			struct aw_spinand_ecc *ecc = chip->ecc;
+			struct aw_spinand_info *info = chip->info;
+			struct aw_spinand_phy_info *pinfo = info->phy_info;
 
-		len = min3(req->ooblen, cache->oob_maxlen,
-				(unsigned int)AW_OOB_SIZE_PER_PHY_PAGE);
-		ret = ecc->copy_from_oob(pinfo->EccProtectedType,
-				req->oobbuf, cache->oobbuf, len);
-		if (unlikely(ret))
-			return ret;
+			len = min3(req->ooblen, cache->oob_maxlen,
+					(unsigned int)AW_OOB_SIZE_PER_PHY_PAGE);
+			ret = ecc->copy_from_oob(pinfo->EccProtectedType,
+					req->oobbuf, cache->oobbuf, len);
+			if (unlikely(ret))
+				return ret;
+		} else {
+			len = min3(req->ooblen, cache->oob_maxlen,
+					(unsigned int)AW_OOB_SIZE_PER_PHY_PAGE);
+			memcpy(req->oobbuf, cache->oobbuf, len);
 
-		/*
-		 * the first byte of cache->oobbuf and req->oobbuf is
-		 * not 0xFF means bad block
-		 */
-		oobtmp = req->oobbuf;
-		if (oobtmp[0] != 0xFF || cache->oobbuf[0] != 0xFF)
-			oobtmp[0] = 0x00;
+		}
 	}
 
 	return 0;

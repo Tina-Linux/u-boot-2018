@@ -60,6 +60,11 @@ int  __attribute__((weak)) clock_set_corepll(int frequency)
 	return 0;
 }
 
+void  __attribute__((weak)) rtc_set_vccio_det_spare(void)
+{
+	return ;
+}
+
 int  __attribute__((weak)) rtc_set_dcxo_off(void)
 {
 	return 0;
@@ -240,6 +245,8 @@ int board_init(void)
 	int boot_clock;
 	script_parser_fetch(FDT_PATH_TARGET, "boot_clock", &boot_clock, uboot_spare_head.boot_data.run_clock);
 	clock_set_corepll(boot_clock);
+	/*fix reset circuit detection threshold*/
+	rtc_set_vccio_det_spare();
 	tick_printf("CPU=%d MHz,PLL6=%d Mhz,AHB=%d Mhz, APB1=%dMhz  MBus=%dMhz\n",
 		clock_get_corepll(),
 		clock_get_pll6(), clock_get_ahb(),

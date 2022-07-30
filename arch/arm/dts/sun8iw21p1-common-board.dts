@@ -22,121 +22,6 @@
 	pmu_safe_vol = <3500>;
 };
 
-
-&twi6 {
-	clock-frequency = <200000>;
-	pinctrl-0 = <&s_twi0_pins_a>;
-	no_suspend = <1>;
-	twi_drv_used = <1>;
-	status = "okay";
-};
-
-&pwm0_pin_a {
-	allwinner,pins = "PD23";
-	allwinner,function = "pwm0";
-	allwinner,muxsel = <0x02>;
-	allwinner,drive = <1>;
-	allwinner,pull = <0>;
-};
-
-&pwm0_pin_b {
-	allwinner,pins = "PD23";
-	allwinner,function = "io_disabled";
-	allwinner,muxsel = <0x07>;
-	allwinner,drive = <0x2>;
-	allwinner,pull = <0>;
-};
-
-&pwm1_pin_a {
-	allwinner,pins = "PD22";
-	allwinner,function = "pwm1";
-	allwinner,muxsel = <0x02>;
-	allwinner,drive = <0x2>;
-	allwinner,pull = <0>;
-};
-
-&pwm1_pin_b {
-	allwinner,pins = "PD22";
-	allwinner,function = "io_disabled";
-	allwinner,muxsel = <0x07>;
-	allwinner,drive = <0x2>;
-	allwinner,pull = <0>;
-};
-
-
-&pwm {
-	#pwm-cells = <0x3>;
-	compatible = "allwinner,sunxi-pwm";
-	pwm-number = <10>;
-	pwm-base = <0x0>;
-	sunxi-pwms = <&pwm0>, <&pwm1>, <&pwm2>, <&pwm3>, <&pwm4>,
-		<&pwm5>, <&pwm6>, <&pwm7>, <&pwm8>, <&pwm9>;
-};
-
-&pwm0 {
-	compatible = "allwinner,sunxi-pwm0";
-	pinctrl-names = "active", "sleep";
-	pinctrl-0 = <&pwm0_pin_a>;
-	pinctrl-1 = <&pwm0_pin_b>;
-	reg_base = <0x0300a000>;
-};
-
-&pwm1 {
-	compatible = "allwinner,sunxi-pwm1";
-	pinctrl-names = "active", "sleep";
-	pinctrl-0 = <&pwm1_pin_a>;
-	pinctrl-1 = <&pwm1_pin_b>;
-	reg_base = <0x0300a000>;
-};
-
-&pwm2 {
-	compatible = "allwinner,sunxi-pwm2";
-	pinctrl-names = "active", "sleep";
-	reg_base = <0x0300a000>;
-};
-
-&pwm3 {
-	compatible = "allwinner,sunxi-pwm3";
-	pinctrl-names = "active", "sleep";
-	reg_base = <0x0300a000>;
-};
-
-&pwm4 {
-	compatible = "allwinner,sunxi-pwm4";
-	pinctrl-names = "active", "sleep";
-	reg_base = <0x0300a000>;
-};
-
-&pwm5 {
-	compatible = "allwinner,sunxi-pwm5";
-	pinctrl-names = "active", "sleep";
-	reg_base = <0x0300a000>;
-};
-
-&pwm6 {
-	compatible = "allwinner,sunxi-pwm6";
-	pinctrl-names = "active", "sleep";
-	reg_base = <0x0300a000>;
-};
-
-&pwm7 {
-	compatible = "allwinner,sunxi-pwm7";
-	pinctrl-names = "active", "sleep";
-	reg_base = <0x0300a000>;
-};
-
-&pwm8 {
-	compatible = "allwinner,sunxi-pwm8";
-	pinctrl-names = "active", "sleep";
-	reg_base = <0x0300a000>;
-};
-
-&pwm9 {
-	compatible = "allwinner,sunxi-pwm9";
-	pinctrl-names = "active", "sleep";
-	reg_base = <0x0300a000>;
-};
-
 &sdc0_pins_a {
 	allwinner,pins = "PF0", "PF1", "PF2",
 			 "PF3", "PF4", "PF5";
@@ -350,22 +235,8 @@
 
 &aliases {
 	nand0 = &nand0;
-	twi6 = &twi6;
-	pwm = &pwm;
-	pwm0 = &pwm0;
-	pwm1 = &pwm1;
-	pwm2 = &pwm2;
-	pwm3 = &pwm3;
-	pwm4 = &pwm4;
-	pwm5 = &pwm5;
-	pwm6 = &pwm6;
-	pwm7 = &pwm7;
-	pwm8 = &pwm8;
-	pwm9 = &pwm9;
 	disp = &disp;
 	lcd0 = &lcd0;
-	lcd1 = &lcd1;
-	eink = &eink;
 	spi0 = &spi0;
 
 };

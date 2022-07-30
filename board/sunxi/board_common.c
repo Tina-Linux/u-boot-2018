@@ -60,6 +60,7 @@
 #include "sunxi_lradc_vol.h"
 #endif
 #include <fastlogo.h>
+#include <sunxi_eink.h>
 
 int  __attribute__((weak)) sunxi_platform_power_off(void)
 {
@@ -485,9 +486,9 @@ int initr_sunxi_eink(void)
 		return 0;
 	}
 	eink_driver_init();
-#if 0
-	sunxi_eink_fresh_image("bootlogo.bmp", 0x04);
-	__udelay(3000);
+	eink_framebuffer_init();
+#ifdef CONFIG_PMIC_TPS65185
+		tps65185_modules_init();
 #endif
 	return 0;
 }
@@ -536,21 +537,19 @@ int tps65185_modules_init(void)
 int board_early_init_r(void)
 {
 	int ret = 0;
-
 #ifdef CONFIG_CLK_SUNXI
 	int work_mode = get_boot_work_mode();
 	if ((work_mode == WORK_MODE_BOOT) ||
 		(work_mode == WORK_MODE_CARD_PRODUCT) ||
-		(work_mode == WORK_MODE_CARD_UPDATE))
+		(work_mode == WORK_MODE_USB_PRODUCT) ||
+		(work_mode == WORK_MODE_CARD_UPDATE)) {
 		clk_init();
-#endif
-
-	ret  = initr_sunxi_display();
-
+		ret  = initr_sunxi_display();
 #ifdef CONFIG_EINK200_SUNXI
-	ret = initr_sunxi_eink();
+		ret = initr_sunxi_eink();
 #endif
-
+	}
+#endif
 
 	return ret;
 }
@@ -576,7 +575,10 @@ void sunxi_early_logo_display(void)
 				  (int *)&advert_enable, sizeof(int) / 4);
 	if ((ret == 0) && (advert_enable == 1)) {
 		gd->boot_logo_addr = 0;
-		return;
+		/* card product need boot_gui_init, so do not return */
+		if (work_mode != WORK_MODE_CARD_PRODUCT
+			&& work_mode != WORK_MODE_CARD_UPDATE)
+			return;
 	}
 #endif
 
@@ -603,8 +605,6 @@ void board_bootlogo_display(void)
 	boot_gui_init();
 
 #ifdef CONFIG_SUNXI_POWER
-	/*chargemode should display charging logo, not bootlogo*/
-	sunxi_update_axp_info();
 	if (gd->chargemode)
 		return;
 #endif
@@ -628,18 +628,37 @@ void board_bootlogo_display(void)
 #endif
 }
 #endif
+
 int board_env_late_init(void)
 {
 	if (get_boot_work_mode() == WORK_MODE_BOOT) {
-#ifdef CONFIG_SUNXI_KEYBOX
-		sunxi_keybox_init();
+
+#ifdef CONFIG_SUNXI_POWER
+		sunxi_update_axp_info();
 #endif
+
+#ifdef CONFIG_BOOT_GUI
+		void board_bootlogo_display(void);
+		board_bootlogo_display();
+#else
+#ifdef CONFIG_SUNXI_SPINOR_JPEG
+		int sunxi_jpeg_display(const char *filename);
+		sunxi_jpeg_display("bootlogo.jpg");
+#endif
+
 #ifdef CONFIG_SUNXI_SPINOR_BMP
 #if defined(CONFIG_CMD_FAT)
 		fat_read_logo_to_kernel("bootlogo.bmp");
 #else
 		read_bmp_to_kernel("bootlogo");
 #endif
+
+#endif /* CONFIG_SUNXI_SPINOR_BMP */
+
+#endif /* CONFIG_BOOT_GUI */
+
+#ifdef CONFIG_SUNXI_KEYBOX
+		sunxi_keybox_init();
 #endif
 	}
 	return 0;
@@ -703,9 +722,6 @@ int board_late_init(void)
 		sunxi_auto_switch_system();
 #endif
 
-#ifdef CONFIG_PMIC_TPS65185
-		tps65185_modules_init();
-#endif
 
 #ifdef CONFIG_SUNXI_LRADC_VOL
 /* Note: lradc should be initialized 30ms before
@@ -715,8 +731,7 @@ int board_late_init(void)
 		lradc_reg_init();
 #endif
 #ifdef CONFIG_EINK200_SUNXI
-		sunxi_eink_fresh_image("bootlogo.bmp", 0x04);
-		__udelay(3000);
+		sunxi_bmp_display("bootlogo.bmp");
 #endif
 
 #ifdef CONFIG_SUNXI_ARISC_EXIST

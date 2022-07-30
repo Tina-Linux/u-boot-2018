@@ -258,13 +258,15 @@ int axp_get_battery_status(void)
 {
 	int dcin_exist, bat_vol;
 	int ratio;
-	int safe_vol = 0;
+	int safe_vol = 0, safe_ratio = 1;
 	dcin_exist   = bmu_get_axp_bus_exist();
 	bat_vol      = bmu_get_battery_vol();
 	script_parser_fetch(FDT_PATH_CHARGER0, "pmu_safe_vol", &safe_vol, -1);
+	script_parser_fetch(FDT_PATH_CHARGER0, "pmu_safe_ratio", &safe_ratio, 1);
 	ratio = bmu_get_battery_capacity();
 	pr_msg("bat_vol=%d, ratio=%d\n", bat_vol, ratio);
-	if (ratio < 1) {
+	pr_msg("safe_vol=%d, safe_ratio=%d\n", safe_vol, safe_ratio);
+	if (ratio < safe_ratio) {
 		if (dcin_exist) {
 			return BATTERY_RATIO_TOO_LOW_WITH_DCIN;
 		}
@@ -273,20 +275,22 @@ int axp_get_battery_status(void)
 	if (bat_vol < safe_vol) {
 		return BATTERY_VOL_TOO_LOW;
 	}
-
 	return BATTERY_RATIO_ENOUGH;
 }
 
 int sunxi_bat_low_vol_handle(void)
 {
-	int i = 0, safe_vol = 0;
+	int i = 0, safe_vol = 0, safe_ratio = 1;
 	int onoff = DISP_LCD_BACKLIGHT_ENABLE;
 	__maybe_unused char arg[3] = {0};
 	int bat_vol      = bmu_get_battery_vol();
 	int dcin_exist   = bmu_get_axp_bus_exist();
 	int bat_ratio    = bmu_get_battery_capacity();
 	script_parser_fetch(FDT_PATH_CHARGER0, "pmu_safe_vol", &safe_vol, -1);
-	while (bat_vol < safe_vol || bat_ratio < 1) {
+	script_parser_fetch(FDT_PATH_CHARGER0, "pmu_safe_ratio", &safe_ratio, 1);
+	pr_force("bat_ratio:%d\tsafe_ratio:%d\tbat_vol:%dmV\tsafe_vol:%dmV\n",
+			bat_ratio, safe_ratio, bat_vol, safe_vol);
+	while (bat_vol < safe_vol || bat_ratio < safe_ratio) {
 		bat_vol = bmu_get_battery_vol();
 		bat_ratio = bmu_get_battery_capacity();
 		dcin_exist = bmu_get_axp_bus_exist();
@@ -295,7 +299,8 @@ int sunxi_bat_low_vol_handle(void)
 				i = 0;
 				onoff = DISP_LCD_BACKLIGHT_DISABLE;
 				pr_notice("onoff:DISP_LCD_BACKLIGHT_DISABLE\n");
-				pr_force("bat_ratio:%d%\tbat_vol:%dmV\tsafe_vol:%dmV\n", bat_ratio, bat_vol, safe_vol);
+				pr_force("bat_ratio:%d\tsafe_ratio:%d\tbat_vol:%dmV\tsafe_vol:%dmV\n",
+						bat_ratio, safe_ratio, bat_vol, safe_vol);
 #ifdef CONFIG_DISP2_SUNXI
 				disp_ioctl(NULL, onoff, (void *)arg);
 #endif
@@ -316,6 +321,24 @@ int sunxi_bat_low_vol_handle(void)
 			sunxi_bmp_display("bat\\low_pwr.bmp");
 #endif
 			tick_printf("battery ratio is low without dcin,to be shutdown\n");
+			mdelay(3000);
+			sunxi_board_shutdown();
+		}
+		if (ctrlc())
+			break;
+		mdelay(10);
+	}
+	return 0;
+}
+
+int sunxi_bat_key_handle(void)
+{
+	int dcin_exist   = bmu_get_axp_bus_exist();
+	__maybe_unused char arg[3] = {0};
+	while (pmu_get_key_irq() <= 0) {
+		dcin_exist = bmu_get_axp_bus_exist();
+		if (!dcin_exist) {
+			tick_printf("dcin is out,to be shutdown\n");
 			mdelay(3000);
 			sunxi_board_shutdown();
 		}
@@ -366,7 +389,7 @@ int axp_set_dcdc_mode(void)
 int axp_battery_status_handle(void)
 {
 	int battery_status;
-	int ret = 0, bat_exist = 0, ntc_status = -1;
+	int ret = 0, bat_exist = 0, ntc_status = -1, charge_mode;
 
 	ret = script_parser_fetch(FDT_PATH_POWER_SPLY, "battery_exist", &bat_exist, 1);
 	if (ret < 0)
@@ -379,11 +402,15 @@ int axp_battery_status_handle(void)
 	if (ret < 1)
 		return 0;
 
-	ret = script_parser_fetch(FDT_PATH_POWER_SPLY, "ntc_status", &ntc_status, 1);
+	ret = script_parser_fetch(FDT_PATH_POWER_SPLY, "ntc_status", &ntc_status, 0);
 	if (ret < 0)
-		ntc_status = 1;
+		ntc_status = 0;
 
 	bmu_set_ntc_onoff(ntc_status);
+
+	ret = script_parser_fetch(FDT_PATH_POWER_SPLY, "charge_mode", &charge_mode, 1);
+	if (ret < 0)
+		charge_mode = 1;
 
 #ifdef CONFIG_AXP_LATE_INFO
 	battery_status = axp_get_battery_status();
@@ -395,7 +422,7 @@ int axp_battery_status_handle(void)
 			|| (battery_status == BATTERY_RATIO_TOO_LOW_WITHOUT_DCIN)
 			|| (battery_status == BATTERY_VOL_TOO_LOW)) {
 
-#ifdef CONFIG_CMD_SUNXI_BMP
+#if defined(CONFIG_EINK200_SUNXI) || defined(CONFIG_CMD_SUNXI_BMP)
 			sunxi_bmp_display("bat\\bat0.bmp");
 #endif
 #if 0
@@ -405,19 +432,26 @@ int axp_battery_status_handle(void)
 #else
 		sunxi_bat_low_vol_handle();
 #endif
+		} else if (charge_mode == 2) {
+			tick_printf("press power_on to start up\n");
+			sunxi_bat_key_handle();
 		} else {
-#ifdef CONFIG_CMD_SUNXI_BMP
+#if defined(CONFIG_EINK200_SUNXI) || defined(CONFIG_CMD_SUNXI_BMP)
 			sunxi_bmp_display("bat\\battery_charge.bmp");
 #endif
 		}
 	} else if ((battery_status == BATTERY_RATIO_TOO_LOW_WITHOUT_DCIN) || (battery_status == BATTERY_VOL_TOO_LOW)) {
-#ifdef CONFIG_CMD_SUNXI_BMP
+#if defined(CONFIG_EINK200_SUNXI) || defined(CONFIG_CMD_SUNXI_BMP)
 		sunxi_bmp_display("bat\\low_pwr.bmp");
 #endif
 		tick_printf("battery ratio or vol is low ,to be shutdown\n");
 		mdelay(3000);
 		sunxi_board_shutdown();
 	}
+
+	if (charge_mode == 2 || charge_mode == 0)
+		gd->chargemode = 0;
+
 	return 0;
 }
 
@@ -431,15 +465,11 @@ int sunxi_update_axp_info(void)
 {
 	int val = -1;
 	char bootreason[16] = {0};
-	int ret = 0, bat_exist = 0, charge_mode;
+	int ret = 0, bat_exist = 0;
 
 	ret = script_parser_fetch(FDT_PATH_POWER_SPLY, "battery_exist", &bat_exist, 1);
 	if (ret < 0)
 		bat_exist = 1;
-
-	ret = script_parser_fetch(FDT_PATH_POWER_SPLY, "charge_mode", &charge_mode, 1);
-	if (ret < 0)
-		charge_mode = 1;
 
 #ifdef CONFIG_SUNXI_BMU
 #ifdef CONFIG_AXP_LATE_INFO
@@ -464,7 +494,7 @@ int sunxi_update_axp_info(void)
 		break;
 	case AXP_BOOT_SOURCE_CHARGER:
 		strncpy(bootreason, "charger", sizeof("charger"));
-		if (bat_exist && charge_mode)
+		if (bat_exist)
 			gd->chargemode = 1;
 		break;
 	case AXP_BOOT_SOURCE_BATTERY:

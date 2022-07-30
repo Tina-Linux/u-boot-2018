@@ -296,9 +296,28 @@ void update_bootargs(void)
 	sprintf(tmpbuf, " uboot_message=%s(%s-%s)", PLAIN_VERSION, U_BOOT_DMI_DATE, U_BOOT_TIME);
 	strcat(cmdline, tmpbuf);
 #ifdef CONFIG_SPINOR_LOGICAL_OFFSET
+#if defined (CONFIG_ENABLE_MTD_CMDLINE_PARTS_BY_ENV)
+	char *mtdpart = env_get("sunxi_mtdparts");
+	char *tmpaddr;
+	char *desbuff =NULL;
+	char part_buff[218] = {0};
+	char device_name[16] = {0};
+
+	if(mtdpart != NULL) {
+		tmpaddr = strchr(mtdpart,':');
+		strncpy(device_name, mtdpart, (tmpaddr + 1 - mtdpart));
+		strcpy(part_buff, (tmpaddr+1));
+		desbuff = tmpbuf;
+		sprintf(desbuff,"%s mtdparts=%s%dK(uboot)ro,%s",tmpbuf,device_name,
+				(CONFIG_SPINOR_LOGICAL_OFFSET * 512 / 1024),part_buff);
+
+		strcat(cmdline, tmpbuf);
+	}
+#else
 	/*spi-nor logical offset */
 	sprintf(tmpbuf, " mbr_offset=%d", (CONFIG_SPINOR_LOGICAL_OFFSET * 512));
 	strcat(cmdline, tmpbuf);
+#endif
 #endif
 
 #if defined(CONFIG_BOOT_GUI) || defined(CONFIG_SUNXI_SPINOR_BMP) || defined(CONFIG_SUNXI_SPINOR_JPEG)

@@ -218,6 +218,8 @@ static inline bool mmc_is_tuning_cmd(uint cmdidx)
 /*
  * EXT_CSD fields
  */
+#define EXT_CSD_FFU_STATUS		26	/* RO */
+#define EXT_CSD_MODE_CONFIG		30	/* R/W/E_P */
 #define EXT_CSD_ENH_START_ADDR		136	/* R/W */
 #define EXT_CSD_ENH_SIZE_MULT		140	/* R/W */
 #define EXT_CSD_GP_SIZE_MULT		143	/* R/W */
@@ -231,6 +233,7 @@ static inline bool mmc_is_tuning_cmd(uint cmdidx)
 #define EXT_CSD_WR_REL_PARAM		166	/* R */
 #define EXT_CSD_WR_REL_SET		167	/* R/W */
 #define EXT_CSD_RPMB_MULT		168	/* RO */
+#define EXT_CSD_FW_CONFIG		169	/* R/W */
 #define EXT_CSD_USER_WP			171	/* R/W */
 #define EXT_CSD_ERASE_GROUP_DEF		175	/* R/W */
 #define EXT_CSD_BOOT_BUS_WIDTH		177
@@ -252,6 +255,7 @@ static inline bool mmc_is_tuning_cmd(uint cmdidx)
 #define EXT_CSD_TRIM_MULT               232    /* RO */
 #define EXT_CSD_POWER_OFF_LONG_TIME     247     /* RO */
 #define EXT_CSD_GENERIC_CMD6_TIME       248     /* RO */
+#define EXT_CSD_SUPPORTED_MODES       	493     /* RO */
 #define EXT_CSD_BKOPS_SUPPORT		502	/* RO */
 
 /*
@@ -681,6 +685,9 @@ struct mmc_config {
 	char *emmc_ffu_fw;      /*original fw(32G),other FWs please add at the back*/
 	char *emmc_ffu_fw1;
 	uint emmc_set_block_count;
+	/*ext_csd 261:254*/
+	u64 ffu_src_fw_version;
+	u64 ffu_dest_fw_version;
 
 	/* 1: boot0 support HS400 or HS200; 0: not support*/
 	u8 boot0_sup_1v8;

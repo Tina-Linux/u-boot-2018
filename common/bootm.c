@@ -549,6 +549,7 @@ static int bootm_load_os(bootm_headers_t *images, unsigned long *load_end,
 #endif
 	load_buf = map_sysmem(load, 0);
 	image_buf = map_sysmem(os.image_start, image_len);
+	sunxi_mem_info("kernel", load_buf, image_len);
 	err = bootm_decomp_image(os.comp, load, os.image_start, os.type,
 				 load_buf, image_buf, image_len,
 				 bootm_len, load_end);
@@ -804,6 +805,8 @@ int do_bootm_states(cmd_tbl_t *cmdtp, int flag, int argc, char * const argv[],
 #ifdef CONFIG_TRACE
 	/* Pretend to run the OS, then run a user command */
 	if (!ret && (states & BOOTM_STATE_OS_FAKE_GO)) {
+		printf("fake go, dont actual boot\n");
+		return 0;
 		char *cmd_list = env_get("fakegocmd");
 
 		ret = boot_selected_os(argc, argv, BOOTM_STATE_OS_FAKE_GO,

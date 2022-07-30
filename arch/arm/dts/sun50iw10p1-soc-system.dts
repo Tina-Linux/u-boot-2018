@@ -90,6 +90,23 @@
 					allwinner,pull = <1>;
 				};
 			};
+
+			twi0_pins_a: twi0@0 {
+				allwinner,pins = "PH0", "PH1";
+				allwinner,pname = "twi0_scl", "twi0_sda";
+				allwinner,function = "twi0";
+				allwinner,muxsel = <2>;
+				allwinner,drive = <1>;
+				allwinner,pull = <0>;
+			};
+
+			twi0_pins_b: twi0@1 {
+				allwinner,pins = "PH0", "PH1";
+				allwinner,function = "io_disabled";
+				allwinner,muxsel = <7>;
+				allwinner,drive = <1>;
+				allwinner,pull = <0>;
+			};
 			sdc0_pins_a: sdc0@0 {
 			};
 
@@ -263,6 +280,24 @@
 		lcd1: lcd1@1 {
 			compatible = "allwinner,sunxi-lcd1";
 			reg = <0x0 0x1c0c000 0x0 0x0>;  /* Fake registers to avoid dtc compiling warnings */
+			pinctrl-names = "active","sleep";
+			status = "okay";
+		};
+
+		twi0: twi@5002000{
+			compatible = "allwinner,sun50i-twi";
+			pinctrl-names = "default", "sleep";
+			status = "okay";
+
+		};
+		tps65185: tps65185@68 {
+			compatible = "allwinner, tps65185";
+			pinctrl-names = "active","sleep";
+			status = "okay";
+		};
+
+		tps65185_slave: tps65185_slave@68{
+			compatible = "allwinner, tps65185_slave";
 			pinctrl-names = "active","sleep";
 			status = "okay";
 		};

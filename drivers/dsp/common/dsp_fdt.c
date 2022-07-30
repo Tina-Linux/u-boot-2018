@@ -294,3 +294,38 @@ int dts_sharespace_msg(struct dts_msg_t *pmsg, u32 dsp_id)
 
 	return 0;
 }
+
+int dts_get_dsp_memory(ulong *start, u32 *size, u32 id)
+{
+	struct fdt_header *dtb_base = working_fdt;
+	int nodeoffset;
+	int ret;
+	u32 reg_data[8];
+
+	if (id  == 0) {
+		nodeoffset = fdt_path_offset(dtb_base, "/reserved-memory/dsp0");
+		if (nodeoffset < 0) {
+			pr_err("%s: no /reserved-memory/dsp0 in fdt\n", __func__);
+			return -1;
+		}
+	} else {
+		nodeoffset = fdt_path_offset(dtb_base, "/reserved-memory/dsp1");
+		if (nodeoffset < 0) {
+			pr_err("%s: no /reserved-memory/dsp1 in fdt\n", __func__);
+			return -1;
+		}
+	}
+
+	memset(reg_data, 0, sizeof(reg_data));
+	ret = fdt_getprop_u32(dtb_base, nodeoffset, "reg", reg_data);
+	if (ret < 0) {
+		pr_err("%s: error fdt get reg\n", __func__);
+		return -2;
+	}
+
+	*start = reg_data[1];
+	*size = reg_data[3];
+	DSP_DEBUG("start = 0x%x size =0x%x\n", (u32)*start, *size);
+	return 0;
+}
+

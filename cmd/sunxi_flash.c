@@ -16,6 +16,7 @@
 #include <part.h>
 #include <image.h>
 #include <android_image.h>
+#include <rtos_image.h>
 #include <sys_partition.h>
 #include <sprite_download.h>
 #include "../sprite/sparse/sparse.h"
@@ -33,6 +34,7 @@ static int sunxi_flash_read_part(struct blk_desc *desc, disk_partition_t *info,
 	u8 *addr;
 	struct andr_img_hdr *fb_hdr;
 	image_header_t *uz_hdr;
+	struct rtos_img_hdr *rtos_hdr;
 
 	addr	= (void *)buffer;
 	start_block = (uint)info->start;
@@ -45,6 +47,7 @@ static int sunxi_flash_read_part(struct blk_desc *desc, disk_partition_t *info,
 
 	fb_hdr = (struct andr_img_hdr *)addr;
 	uz_hdr = (image_header_t *)addr;
+	rtos_hdr = (struct rtos_img_hdr *)addr;
 	if (load_size)
 		rbytes = load_size;
 	else if (!memcmp(fb_hdr->magic, ANDR_BOOT_MAGIC, 8)) {
@@ -52,9 +55,11 @@ static int sunxi_flash_read_part(struct blk_desc *desc, disk_partition_t *info,
 
 		/*secure boot img may attached with an embbed cert*/
 		rbytes += sunxi_boot_image_get_embbed_cert_len(fb_hdr);
-	} else if (image_check_magic(uz_hdr))
+	} else if (image_check_magic(uz_hdr)) {
 		rbytes = image_get_data_size(uz_hdr) + image_get_header_size();
-	else {
+	} else if (!memcmp(rtos_hdr->rtos_magic, RTOS_BOOT_MAGIC, 8)) {
+		rbytes = sizeof(struct rtos_img_hdr) + rtos_hdr->rtos_size;
+	} else {
 		debug("bad boot image magic, maybe not a boot.img?\n");
 		rbytes = info->size * 512;
 	}
@@ -65,7 +70,7 @@ static int sunxi_flash_read_part(struct blk_desc *desc, disk_partition_t *info,
 
 	ret = blk_dread(desc, start_block, rblock, (u_char *)addr);
 	ret = (ret == rblock) ? 0 : 1;
-
+	sunxi_mem_info((char *)info->name, (void *)buffer, rbytes);
 	debug("sunxi flash read :offset %x, %d bytes %s\n", (u32)info->start,
 	      rbytes, ret == 0 ? "OK" : "ERROR");
 

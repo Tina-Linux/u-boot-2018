@@ -353,6 +353,14 @@ static int __usb_get_descriptor(struct usb_device_request *req, uchar *buffer)
 			}
 			else
 			{
+				bLength = MIN(4, req->wLength);
+
+				buffer[0] = bLength;
+				buffer[1] = USB_DT_STRING;
+				buffer[2] = 9;
+				buffer[3] = 4;
+				sunxi_udc_send_setup(bLength, (void *)buffer);
+
 				printf("sunxi usb err: string line %d is not supported\n", string_index);
 			}
 		}
@@ -1282,7 +1290,11 @@ static int __sunxi_usb_efex_op_cmd(u8 *cmd_buffer)
 			{
 				fes_cmd_verify_value_t  *cmd_verify = (fes_cmd_verify_value_t *)cmd_buf;
 				fes_efex_verify_t 		*verify_data= (fes_efex_verify_t *)trans_data.base_send_buffer;
-
+#ifdef CONFIG_DISABLE_SUNXI_PART_DOWNLOAD
+				printf("DISABLE SUNXI MBR : so start of verify would offset to -16K \n");
+				printf("old offset :%x \n", cmd_verify->start);
+				cmd_verify->start -= SUNXI_MBR_SIZE / 512;
+#endif
 				verify_data->media_crc = sunxi_sprite_part_rawdata_verify(cmd_verify->start, cmd_verify->size);
 				verify_data->flag 	   = EFEX_CRC32_VALID_FLAG;
 
@@ -1298,7 +1310,7 @@ static int __sunxi_usb_efex_op_cmd(u8 *cmd_buffer)
 			printf("FEX_CMD_fes_verify_status\n");
 			{
 //				fes_cmd_verify_status_t *cmd_verify = (fes_cmd_verify_status_t *)cmd_buf;
-				fes_efex_verify_t 		*verify_data= (fes_efex_verify_t *)trans_data.base_send_buffer;
+				fes_efex_verify_t 	*verify_data= (fes_efex_verify_t *)trans_data.base_send_buffer;
 
 				verify_data->flag 	   = EFEX_CRC32_VALID_FLAG;
 				verify_data->media_crc = trans_data.last_err;
@@ -1677,7 +1689,12 @@ static void dram_data_recv_finish(uint data_type)
 		    {       //烧录mbr
                         printf("SUNXI_EFEX_MBR_TAG\n");
                         printf("mbr size = 0x%x\n", trans_data.to_be_recved_size);
+#ifndef CONFIG_DISABLE_SUNXI_PART_DOWNLOAD
                         trans_data.last_err = sunxi_sprite_download_mbr((void *)trans_data.base_recv_buffer, trans_data.to_be_recved_size);
+#else
+			printf("DISABLE SUNXI MBR : so do not need to write mbr to flash \n");
+			trans_data.last_err = 0;
+#endif
 		    }
 		    else
 		    {
@@ -2108,13 +2125,17 @@ static int sunxi_efex_state_loop(void  *buffer)
 						sunxi_usb_dbg("SUNXI_EFEX_DRAM_MASK\n");
 						if(trans_data.type & SUNXI_EFEX_TRANS_FINISH_TAG)	//表示当前类型数据已经接收完成
 						{
-                            dram_data_recv_finish(data_type);
+				dram_data_recv_finish(data_type);
                         }
 						//数据还没有接收完毕，等待继续接收
 					}
 					else		//表示当前数据需要写入flash
 					{
 						sunxi_usb_dbg("SUNXI_EFEX_FLASH_MASK\n");
+#ifdef CONFIG_DISABLE_SUNXI_PART_DOWNLOAD
+						//printf("DISABLE SUNXI MBR : so start of wirte would offset to -16K \n");
+						trans_data.flash_start -= SUNXI_MBR_SIZE / 512 ;
+#endif
 						if(!sunxi_flash_write(trans_data.flash_start, trans_data.flash_sectors, (void *)trans_data.act_recv_buffer))
 						{
 							printf("sunxi usb efex err: write flash from 0x%x, sectors 0x%x failed\n", trans_data.flash_start, trans_data.flash_sectors);
@@ -2263,6 +2284,10 @@ static int sunxi_efex_state_loop(void  *buffer)
                     }
 
 #else
+#ifdef CONFIG_DISABLE_SUNXI_PART_DOWNLOAD
+		    //printf("DISABLE SUNXI MBR : so start of wirte would offset to -16K \n");
+		    trans_data.flash_start -= SUNXI_MBR_SIZE / 512 ;
+#endif
                     if(!sunxi_flash_write(trans_data.flash_start, trans_data.flash_sectors, (void *)trans_data.act_recv_buffer))
                     {
                         printf("sunxi usb efex err: write flash from 0x%x, sectors 0x%x failed\n", trans_data.flash_start, trans_data.flash_sectors);

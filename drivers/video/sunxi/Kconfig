@@ -208,14 +208,12 @@ config DISP2_TV_GM7121
  	depends on (DISP2_SUNXI && TV_DISP2_SUNXI)
 	default n
 	---help---
-	Support GM7121 TV module
 
 config DISP2_TV_AC200
 	bool "AC200 TV module Support(sunxi-disp2)"
 	depends on (DISP2_SUNXI && TV_DISP2_SUNXI)
 	default n
 	---help---
-	Support AC200 TV module
 
 config EDP_DISP2_SUNXI
 	bool "EDP Driver Support(sunxi-disp2)"
@@ -234,22 +232,12 @@ config EINK_PANEL_USED
 	depends on (DISP2_SUNXI && CONFIG_MACH_SUN8IW15)
 	default n
 	---help---
-	Eink panel
 
 config EINK200_SUNXI
 	bool "Eink Driver Version 2.0 Support"
 	depends on (ARCH_SUNXI)
 	default n
 	---help---
-	Eink Driver Version 2.0
-
-config COMPATIBLE_PANEL_RECORD
-	bool "record LCD compatible panel"
-	depends on (DISP2_SUNXI)
-	default y
-	---help---
-	if y, record the using panel and NOT try every compatible
-	panel after the first boot to reduce boot time.
 
 menu "LCD panels select"
 	depends on DISP2_SUNXI

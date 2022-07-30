@@ -135,6 +135,12 @@ int sunxi_riscv_init(u32 img_addr, u32 run_ddr, u32 riscv_id)
 		reg_val |= RISCV_CLK_GATING;
 		reg_val |= RISCV_GATING_RST_FIELD;
 		writel_riscv(reg_val, SUNXI_CCM_BASE + RISCV_GATING_RST_REG);
+
+		/* set e907 clock to peri_600M */
+		reg_val = readl_riscv(SUNXI_CCM_BASE + CCMU_RISCV_CLK_REG);
+		reg_val |= RISCV_CLK_PERI_600M;
+		writel_riscv(reg_val, SUNXI_CCM_BASE + CCMU_RISCV_CLK_REG);
+
 		/* clock gating reset*/
 		reg_val = readl_riscv(SUNXI_CCM_BASE + RISCV_GATING_RST_REG);
 		reg_val &= ~(0xffff << 16);
